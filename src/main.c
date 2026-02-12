@@ -26,7 +26,7 @@ int main(void) {
 
 
     Tilemap map = LoadTilemap("../assets/tilemaps/gynecology.json");
-    LoadAutoTile(&map, "../assets/tilesets/TileA4.png", 256.0f, 320.0f);
+    LoadAutoTile(&map, "../assets/tilesets/TileA4.png", (Vector2){256.0f, 320.0f});
 
     Collusion collusion = CreateCollusion(&map);
     SetupCollusion(&collusion, &map);
@@ -36,7 +36,7 @@ int main(void) {
     // ClearBackground(BLANK);
     // EndTextureMode();
 
-    RenderTexture2D bakedMap = SetupTextureMode(&map);
+    RenderTexture2D bakedMap = GenerateTilemapRenderTexture(&map);
     
     // Setup camera bounds based on tilemap
     GameCamera camera = InitGameCamera(screenWidth, screenHeight);
@@ -81,7 +81,7 @@ int main(void) {
     UnloadRenderTexture(bakedMap);
     // UnloadTexture(tileset);
 
-    UnloadTilemap(map);
+    UnloadTilemap(&map);
     UnloadItem(shirt);
     UnloadItem(pant);
     UnloadItem(hair);

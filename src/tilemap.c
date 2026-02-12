@@ -21,7 +21,7 @@ static bool IsTilePresent(const TileLayer* layer, int x, int y, int W, int H);
 static void RenderBaseTiles(const Tilemap* map);
 static void RenderAutotileEdges(const Tilemap* map, const TileLayer* layer, int W, int H, float TW, float TH);
 static void RenderAutotileCorners(const Tilemap* map, const TileLayer* layer, int W, int H, float TW, float TH);
-
+static uint8_t GetTileBitmask(const TileLayer *layer, int x, int y, int W, int H);
 
 static bool
 LoadLayers(Tilemap* tilemap, const cJSON* layers_node)
@@ -59,7 +59,6 @@ LoadLayers(Tilemap* tilemap, const cJSON* layers_node)
             continue;
         }
 
-        layer->id       = id_obj->valueint;
         layer->width    = width_obj->valueint;
         layer->height   = height_obj->valueint;
         layer->visible  = cJSON_IsTrue(cJSON_GetObjectItem(item, "visible"));
@@ -144,6 +143,24 @@ IsTilePresent(const TileLayer* layer, const int x, const int y, const int W, con
     return x >= 0 && x < W && y >= 0 && y < H && layer->data[y * W + x] != 0;
 }
 
+static uint8_t
+GetTileBitmask(const TileLayer *layer, int x, int y, int W, int H)
+{
+    uint8_t mask = 0;
+
+    if (IsTilePresent(layer, x, y - 1, W, H)) mask |= NEIGHBOR_N;
+    if (IsTilePresent(layer, x, y + 1, W, H)) mask |= NEIGHBOR_S;
+    if (IsTilePresent(layer, x + 1, y, W, H)) mask |= NEIGHBOR_E;
+    if (IsTilePresent(layer, x - 1, y, W, H)) mask |= NEIGHBOR_W;
+
+    if (IsTilePresent(layer, x - 1, y - 1, W, H)) mask |= NEIGHBOR_NW;
+    if (IsTilePresent(layer, x + 1, y - 1, W, H)) mask |= NEIGHBOR_NE;
+    if (IsTilePresent(layer, x - 1, y + 1, W, H)) mask |= NEIGHBOR_SW;
+    if (IsTilePresent(layer, x + 1, y + 1, W, H)) mask |= NEIGHBOR_SE;
+
+    return mask;
+}
+
 static void
 RenderBaseTiles(const Tilemap* map)
 {
@@ -171,91 +188,80 @@ RenderBaseTiles(const Tilemap* map)
 }
 
 static void
-RenderAutotileEdges(const Tilemap* map, const TileLayer* layer, const int W, const int H, const float TW, const float TH) {
+RenderAutotileEdges(const Tilemap* map, const TileLayer* layer, const int W, const int H, const float TW, const float TH)
+{
     const float hW = TW / 2.0f;
     const float hH = TH / 2.0f;
 
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
-            unsigned int gid = layer->data[y * W + x];
-            if (gid == 0) continue;
+            if (layer->data[y * W + x] == 0) continue;
 
+            const uint8_t mask = GetTileBitmask(layer, x, y, W, H);
             const Vector2 gPos = { (float)x * TW, (float)y * TH };
 
-            const bool N_empty = !IsTilePresent(layer, x, y - 1, W, H);
-            const bool S_empty = !IsTilePresent(layer, x, y + 1, W, H);
-            const bool E_empty = !IsTilePresent(layer, x + 1, y, W, H);
-            const bool W_empty = !IsTilePresent(layer, x - 1, y, W, H);
-
-            if (W_empty) DrawTextureRec(map->autoTile->texture, map->autoTile->edge[LEFT],      (Vector2){ gPos.x - hW, gPos.y }, WHITE);
-            if (E_empty) DrawTextureRec(map->autoTile->texture, map->autoTile->edge[RIGHT],     (Vector2){ gPos.x + TW, gPos.y }, WHITE);
-            if (N_empty) DrawTextureRec(map->autoTile->texture, map->autoTile->edge[TOP],       (Vector2){ gPos.x, gPos.y - hH }, WHITE);
-            if (S_empty) DrawTextureRec(map->autoTile->texture, map->autoTile->edge[BOTTOM],    (Vector2){ gPos.x, gPos.y + TH }, WHITE);
+            if (!(mask & NEIGHBOR_S)) DrawTextureRec(map->autoTile->texture, map->autoTile->ground.edges[EDGE_TOP],    (Vector2){ gPos.x, gPos.y + TH }, WHITE);
+            if (!(mask & NEIGHBOR_W)) DrawTextureRec(map->autoTile->texture, map->autoTile->ground.edges[EDGE_RIGHT],  (Vector2){ gPos.x - hW, gPos.y }, WHITE);
+            if (!(mask & NEIGHBOR_E)) DrawTextureRec(map->autoTile->texture, map->autoTile->ground.edges[EDGE_LEFT],   (Vector2){ gPos.x + TW, gPos.y }, WHITE);
+            if (!(mask & NEIGHBOR_N)) DrawTextureRec(map->autoTile->texture, map->autoTile->ground.edges[EDGE_BOTTOM], (Vector2){ gPos.x, gPos.y - hH }, WHITE);
         }
     }
 }
 
 static void
-RenderAutotileCorners(const Tilemap* map, const TileLayer* layer, const int W, const int H, const float TW, const float TH) {
+RenderAutotileCorners(const Tilemap* map, const TileLayer* layer, const int W, const int H, const float TW, const float TH)
+{
     const float hW = TW / 2.0f;
     const float hH = TH / 2.0f;
 
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
-            const unsigned int gid = layer->data[y * W + x];
-            if (gid == 0) continue;
+            if (layer->data[y * W + x] == 0) continue;
 
+            const uint8_t mask = GetTileBitmask(layer, x, y, W, H);
             const Vector2 gPos = { (float)x * TW, (float)y * TH };
 
-            const bool N_empty  = !IsTilePresent(layer, x, y - 1, W, H);
-            const bool S_empty  = !IsTilePresent(layer, x, y + 1, W, H);
-            const bool E_empty  = !IsTilePresent(layer, x + 1, y, W, H);
-            const bool W_empty  = !IsTilePresent(layer, x - 1, y, W, H);
-            const bool NW_empty = !IsTilePresent(layer, x - 1, y - 1, W, H);
-            const bool NE_empty = !IsTilePresent(layer, x + 1, y - 1, W, H);
-            const bool SW_empty = !IsTilePresent(layer, x - 1, y + 1, W, H);
-            const bool SE_empty = !IsTilePresent(layer, x + 1, y + 1, W, H);
-
-            if (W_empty && N_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_right[TOP_LEFT],
+            if (!(mask & NEIGHBOR_W) && !(mask & NEIGHBOR_N))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersOut[CORNER_BOTTOM_RIGHT],
                               (Vector2){ gPos.x - hW, gPos.y - hH }, WHITE);
-            if (E_empty && N_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_right[TOP_RIGHT],
+            if (!(mask & NEIGHBOR_E) && !(mask & NEIGHBOR_N))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersOut[CORNER_BOTTOM_LEFT],
                               (Vector2){ gPos.x + TW, gPos.y - hH }, WHITE);
-            if (W_empty && S_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_right[BOTTOM_LEFT],
+            if (!(mask & NEIGHBOR_W) && !(mask & NEIGHBOR_S))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersOut[CORNER_TOP_RIGHT],
                               (Vector2){ gPos.x - hW, gPos.y + TH }, WHITE);
-            if (E_empty && S_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_right[BOTTOM_RIGHT],
+            if (!(mask & NEIGHBOR_E) && !(mask & NEIGHBOR_S))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersOut[CORNER_TOP_LEFT],
                               (Vector2){ gPos.x + TW, gPos.y + TH }, WHITE);
 
-            if (!N_empty && !W_empty && NW_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_left[BOTTOM_RIGHT],
+            if (mask & NEIGHBOR_N && mask & NEIGHBOR_W && !(mask & NEIGHBOR_NW))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersIn[CORNER_BOTTOM_RIGHT],
                               (Vector2){ gPos.x - hW, gPos.y - hH }, WHITE);
-            if (!N_empty && !E_empty && NE_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_left[BOTTOM_LEFT],
+            if (mask & NEIGHBOR_N && mask & NEIGHBOR_E && !(mask & NEIGHBOR_NE))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersIn[CORNER_BOTTOM_LEFT],
                               (Vector2){ gPos.x + TW, gPos.y - hH }, WHITE);
-            if (!S_empty && !W_empty && SW_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_left[TOP_RIGHT],
+            if (mask & NEIGHBOR_S && mask & NEIGHBOR_W && !(mask & NEIGHBOR_SW))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersIn[CORNER_TOP_LEFT],
                               (Vector2){ gPos.x - hW, gPos.y + TH }, WHITE);
-            if (!S_empty && !E_empty && SE_empty)
-                DrawTextureRec(map->autoTile->texture, map->autoTile->corner_left[TOP_LEFT],
+            if (mask & NEIGHBOR_S && mask & NEIGHBOR_E && !(mask & NEIGHBOR_SE))
+                DrawTextureRec(map->autoTile->texture, map->autoTile->ground.cornersIn[CORNER_TOP_RIGHT],
                               (Vector2){ gPos.x + TW, gPos.y + TH }, WHITE);
         }
     }
 }
 
-Tilemap LoadTilemap(const char* json_file) {
+Tilemap LoadTilemap(const char *jsonPath)
+{
     Tilemap tilemap = {0};
 
-    char* json_string = ReadFile2String(json_file);
-    if (!json_string) return tilemap;
+    char *jsonString = ReadFile2String(jsonPath);
+    if (!jsonString) return tilemap;
 
-    cJSON* root = cJSON_Parse(json_string);
+    cJSON* root = cJSON_Parse(jsonString);
     if (!root)
     {
         fprintf(stderr, "[ERROR] JSON Parse Error\n");
-        free(json_string);
+        free(jsonString);
         return tilemap;
     }
 
@@ -270,106 +276,106 @@ Tilemap LoadTilemap(const char* json_file) {
     const bool tilesets_ok  = LoadTilesets(&tilemap, tilesets_node);
     const bool layers_ok    = LoadLayers(&tilemap, layers_node);
 
-    if (!tilesets_ok || !layers_ok) UnloadTilemap(tilemap);
+    if (!tilesets_ok || !layers_ok) UnloadTilemap(&tilemap);
 
     cJSON_Delete(root);
-    free(json_string);
+    free(jsonString);
 
     return tilemap;
 }
 
-void UnloadTilemap(const Tilemap map)
+void UnloadTilemap(const Tilemap *tilemap)
 {
-    for (int i = 0; i < map.tilesetCount; i++) {
-        if (map.tilesets[i].source) free(map.tilesets[i].source);
-        UnloadTexture(map.tilesets[i].texture);
+    for (int i = 0; i < tilemap->tilesetCount; i++) {
+        if (tilemap->tilesets[i].source) free(tilemap->tilesets[i].source);
+        UnloadTexture(tilemap->tilesets[i].texture);
     }
-    free(map.tilesets);
+    free(tilemap->tilesets);
 
-    for (int i = 0; i < map.layerCount; i++) {
-        free(map.layers[i].data);
-        if (map.layers[i].name) free(map.layers[i].name);
+    for (int i = 0; i < tilemap->layerCount; i++) {
+        free(tilemap->layers[i].data);
+        if (tilemap->layers[i].name) free(tilemap->layers[i].name);
     }
-    free(map.layers);
+    free(tilemap->layers);
 
-    if (map.autoTile) {
-        UnloadTexture(map.autoTile->texture);
-        free(map.autoTile);
+    if (tilemap->autoTile) {
+        UnloadTexture(tilemap->autoTile->texture);
+        free(tilemap->autoTile);
     }
 }
 
-bool LoadAutoTile(Tilemap* map, const char* texture_file, const float x, const float y)
+bool LoadAutoTile(Tilemap *tilemap, const char *texturePath, const Vector2 position)
 {
-    if (!map) {
+    if (!tilemap) {
         fprintf(stderr, "[ERROR] NULL tilemap provided\n");
         return false;
     }
 
-    if (map->autoTile) {
-        UnloadTexture(map->autoTile->texture);
-        free(map->autoTile);
-        map->autoTile = NULL;
+    if (tilemap->autoTile) {
+        UnloadTexture(tilemap->autoTile->texture);
+        free(tilemap->autoTile);
+        tilemap->autoTile = NULL;
     }
 
-    map->autoTile = malloc(sizeof(AutoTile));
-    if (!map->autoTile) {
+    tilemap->autoTile = malloc(sizeof(AutoTile));
+    if (!tilemap->autoTile) {
         fprintf(stderr, "[ERROR] Memory allocation failed for autotile\n");
         return false;
     }
 
-    map->autoTile->texture = LoadTexture(texture_file);
-    if (map->autoTile->texture.id <= 0) {
-        fprintf(stderr, "[ERROR] Failed to load autotile texture: %s\n", texture_file);
-        free(map->autoTile);
-        map->autoTile = NULL;
+    tilemap->autoTile->texture = LoadTexture(texturePath);
+    if (tilemap->autoTile->texture.id <= 0) {
+        fprintf(stderr, "[ERROR] Failed to load autotile texture: %s\n", texturePath);
+        free(tilemap->autoTile);
+        tilemap->autoTile = NULL;
         return false;
     }
 
-    map->autoTile->x = (int)x;
-    map->autoTile->y = (int)y;
+    const float x = position.x;
+    const float y = position.y;
 
-    map->autoTile->corner_left[TOP_LEFT]        = (Rectangle){ x, y, SUB_TILE, SUB_TILE };
-    map->autoTile->corner_left[TOP_RIGHT]       = (Rectangle){ x + SUB_TILE, y, SUB_TILE, SUB_TILE };
-    map->autoTile->corner_left[BOTTOM_RIGHT]    = (Rectangle){ x + SUB_TILE, y + SUB_TILE, SUB_TILE, SUB_TILE };
-    map->autoTile->corner_left[BOTTOM_LEFT]     = (Rectangle){ x, y + SUB_TILE, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersIn[CORNER_TOP_LEFT]       = (Rectangle){ x + SUB_TILE, y, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersIn[CORNER_TOP_RIGHT]      = (Rectangle){ x, y, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersIn[CORNER_BOTTOM_LEFT]    = (Rectangle){ x, y + SUB_TILE, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersIn[CORNER_BOTTOM_RIGHT]   = (Rectangle){ x + SUB_TILE, y + SUB_TILE, SUB_TILE, SUB_TILE };
 
-    map->autoTile->corner_right[BOTTOM_RIGHT]   = (Rectangle){ x + TILE_SIZE, y, SUB_TILE, SUB_TILE };
-    map->autoTile->corner_right[BOTTOM_LEFT]    = (Rectangle){ x + TILE_SIZE + SUB_TILE, y, SUB_TILE, SUB_TILE };
-    map->autoTile->corner_right[TOP_LEFT]       = (Rectangle){ x + TILE_SIZE + SUB_TILE, y + SUB_TILE, SUB_TILE, SUB_TILE };
-    map->autoTile->corner_right[TOP_RIGHT]      = (Rectangle){ x + TILE_SIZE, y + SUB_TILE, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersOut[CORNER_TOP_LEFT]      = (Rectangle){ x + TILE_SIZE, y, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersOut[CORNER_TOP_RIGHT]     = (Rectangle){ x + TILE_SIZE + SUB_TILE, y, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersOut[CORNER_BOTTOM_LEFT]   = (Rectangle){ x + TILE_SIZE, y + SUB_TILE, SUB_TILE, SUB_TILE };
+    tilemap->autoTile->ground.cornersOut[CORNER_BOTTOM_RIGHT]  = (Rectangle){ x + TILE_SIZE + SUB_TILE, y + SUB_TILE, SUB_TILE, SUB_TILE };
 
-    map->autoTile->edge[BOTTOM] = (Rectangle){ x + SUB_TILE, y + TILE_SIZE, TILE_SIZE, SUB_TILE };
-    map->autoTile->edge[TOP]    = (Rectangle){ x + SUB_TILE, y + TILE_SIZE * 2.0f + SUB_TILE, TILE_SIZE, SUB_TILE };
-    map->autoTile->edge[LEFT]   = (Rectangle){ x + TILE_SIZE + SUB_TILE, y + TILE_SIZE + SUB_TILE, SUB_TILE, TILE_SIZE };
-    map->autoTile->edge[RIGHT]  = (Rectangle){ x, y + TILE_SIZE + SUB_TILE, SUB_TILE, TILE_SIZE };
+    tilemap->autoTile->ground.edges[EDGE_TOP]      = (Rectangle){ x + SUB_TILE, y + TILE_SIZE, TILE_SIZE, SUB_TILE };
+    tilemap->autoTile->ground.edges[EDGE_RIGHT]    = (Rectangle){ x + TILE_SIZE + SUB_TILE, y + TILE_SIZE + SUB_TILE, SUB_TILE, TILE_SIZE };
+    tilemap->autoTile->ground.edges[EDGE_BOTTOM]   = (Rectangle){ x + SUB_TILE, y + TILE_SIZE * 2.0f + SUB_TILE, TILE_SIZE, SUB_TILE };
+    tilemap->autoTile->ground.edges[EDGE_LEFT]     = (Rectangle){ x, y + TILE_SIZE + SUB_TILE, SUB_TILE, TILE_SIZE };
 
     return true;
 }
 
-RenderTexture2D SetupTextureMode(Tilemap* map)
+RenderTexture2D GenerateTilemapRenderTexture(const Tilemap *tilemap)
 {
-    if (!map || map->layerCount <= 0 || map->tilesetCount <= 0)
+    if (!tilemap || tilemap->layerCount <= 0 || tilemap->tilesetCount <= 0)
     {
-        fprintf(stderr, "[ERROR] Invalid tilemap for rendering\n");
+        fprintf(stderr, "[ERROR] Invalid tiletilemap for rendering\n");
         return (RenderTexture2D){0};
     }
 
-    const RenderTexture2D canvas = LoadRenderTexture(map->width * map->tileWidth, map->height * map->tileHeight);
+    const RenderTexture2D canvas = LoadRenderTexture(tilemap->width * tilemap->tileWidth, tilemap->height * tilemap->tileHeight);
 
     BeginTextureMode(canvas);
     ClearBackground(BLANK);
 
-    RenderBaseTiles(map);
+    RenderBaseTiles(tilemap);
 
-    if (map->autoTile) {
-        const TileLayer* layer = &map->layers[0];
+    if (tilemap->autoTile) {
+        const TileLayer* layer = &tilemap->layers[0];
         const int W     = (int)layer->width;
         const int H     = (int)layer->height;
-        const float TW  = (float)map->tileWidth;
-        const float TH  = (float)map->tileHeight;
+        const float TW  = (float)tilemap->tileWidth;
+        const float TH  = (float)tilemap->tileHeight;
 
-        RenderAutotileEdges(map, layer, W, H, TW, TH);
-        RenderAutotileCorners(map, layer, W, H, TW, TH);
+        RenderAutotileEdges(tilemap, layer, W, H, TW, TH);
+        RenderAutotileCorners(tilemap, layer, W, H, TW, TH);
     }
 
     EndTextureMode();

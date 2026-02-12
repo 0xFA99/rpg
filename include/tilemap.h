@@ -1,36 +1,65 @@
 #ifndef TILEMAP_H
 #define TILEMAP_H
 
+#include <stdint.h>
+
 #include "raylib.h"
 
 #define TILE_SIZE   32
 #define SUB_TILE    16
 
 typedef enum {
-    LAYER_GROUND,
-    LAYER_COLLUSION,
+    LAYER_GROUND = 0,
+    LAYER_COLLUSION
 } LayerType;
 
 typedef enum {
-    TOP_LEFT = 0,
-    TOP_RIGHT,
-    BOTTOM_RIGHT,
-    BOTTOM_LEFT
+    CORNER_TOP_LEFT = 0,
+    CORNER_TOP_RIGHT,
+    CORNER_BOTTOM_RIGHT,
+    CORNER_BOTTOM_LEFT,
+    CORNER_MAX_SIZE
 } CornerSide;
 
 typedef enum {
-    TOP = 0,
-    RIGHT,
-    BOTTOM,
-    LEFT
+    EDGE_TOP = 0,
+    EDGE_RIGHT,
+    EDGE_BOTTOM,
+    EDGE_LEFT,
+    EDGE_MAX_SIZE
 } EdgeSide;
 
+typedef enum {
+    NEIGHBOR_N  = 1 << 0,   // 1
+    NEIGHBOR_S  = 1 << 1,   // 2
+    NEIGHBOR_E  = 1 << 2,   // 4
+    NEIGHBOR_W  = 1 << 3,   // 8
+    NEIGHBOR_NW = 1 << 4,   // 16
+    NEIGHBOR_NE = 1 << 5,   // 32
+    NEIGHBOR_SW = 1 << 6,   // 64
+    NEIGHBOR_SE = 1 << 7    // 128
+} TileNeighbor;
+
+typedef enum {
+    AUTOTILE_GROUND,
+    AUTOTILE_WALL
+} AutoTileType;
+
 typedef struct {
-    int x, y;
     Texture2D texture;
-    Rectangle corner_left[4];
-    Rectangle corner_right[4];  // 16x16 {top-left, top-right, bottom-right, bottom-left}
-    Rectangle edge[4];          // 16x32 / 32/16 {top, right, bottom, left}
+    Vector2 position;
+    AutoTileType type;
+    union {
+        struct {
+            Rectangle cornersIn[CORNER_MAX_SIZE];
+            Rectangle cornersOut[CORNER_MAX_SIZE];
+            Rectangle edges[EDGE_MAX_SIZE];
+        } ground;
+
+        struct {
+            Rectangle edges[EDGE_MAX_SIZE];
+        } wall;
+    };
 } AutoTile;
 
 typedef struct {
@@ -40,13 +69,19 @@ typedef struct {
 } Tileset;
 
 typedef struct {
-    unsigned int id;
     char *name;
-    unsigned int *data;
-    int x, y;
-    unsigned int width, height;
+    uint32_t *data;
+    uint32_t width;
+    uint32_t height;
+    float offsetX;
+    float offsetY;
     bool visible;
 } TileLayer;
+
+typedef struct {
+    Rectangle *bounds;
+    unsigned count;
+} CollusionData;
 
 typedef struct {
     int width, height;
@@ -58,15 +93,17 @@ typedef struct {
     TileLayer *layers;
     int layerCount;
 
+    CollusionData collusion;
     AutoTile *autoTile;
 } Tilemap;
 
 
-Tilemap LoadTilemap(const char *json_file);
-void UnloadTilemap(Tilemap map);
-bool LoadAutoTile(Tilemap *map, const char *texture_file, float x, float y);
-RenderTexture2D SetupTextureMode(Tilemap *map);
-void DrawAutoTile(Tilemap *map);
+Tilemap LoadTilemap(const char *jsonPath);
+void    UnloadTilemap(const Tilemap *tilemap);
+bool    LoadAutoTile(Tilemap *tilemap, const char *texturePath, Vector2 position);
+void    DrawAutoTile(const Tilemap *tilemap);
+
+RenderTexture2D GenerateTilemapRenderTexture(const Tilemap *tilemap);
 
 
 #endif
