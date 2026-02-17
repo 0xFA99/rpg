@@ -1,91 +1,89 @@
-#include "raylib.h"
-
-#include "game.h"
-#include "player.h"
-#include "tilemap.h"
 #include "camera.h"
-#include "collusion.h"
+#include "raylib.h"
+#include "tilemap.h"
 
-int main(void) {
 
-
-    const int screenWidth = 800;
-    const int screenHeight = 600;
+int main(void)
+{
+    const int screenWidth   = 800;
+    const int screenHeight  = 600;
 
     InitWindow(screenWidth, screenHeight, "RPG Game");
 
+    Item hair       = LoadItem("../assets/characters/ivy/ivy_hair_basic.bin", SLOT_HAIR, "hair");
+    Item shirt      = LoadItem("../assets/characters/ivy/ivy_shirt_basic.bin", SLOT_TOP, "shirt");
+    Item bottom     = LoadItem("../assets/characters/ivy/ivy_bottom_basic.bin", SLOT_BOTTOM, "bottom");
+    // Item sword      = LoadItem("../assets/weapons/short_sword.bin", SLOT_HAND_MAIN, "sword");
+    // Item lantern    = LoadItem("../assets/weapons/lantern.bin", SLOT_HAND_OFF, "lantern");
+
     Player player = InitPlayer();
-
-    const Item shirt  = LoadItem("../assets/characters/ivy/ivy_shirt_basic.png", SLOT_TOP, "Basic Shirt");
-    const Item pant   = LoadItem("../assets/characters/ivy/ivy_bottom_basic.png", SLOT_BOTTOM, "Basic Pant");
-    const Item hair   = LoadItem("../assets/characters/ivy/ivy_hair_basic.png", SLOT_HAIR, "Basic Hair");
-
-    PlayerEquipItem(&player, pant);
-    PlayerEquipItem(&player, shirt);
     PlayerEquipItem(&player, hair);
+    PlayerEquipItem(&player, shirt);
+    PlayerEquipItem(&player, bottom);
+    // PlayerEquipItem(&player, sword);
+    // PlayerEquipItem(&player, lantern);
 
-
-    Tilemap map = LoadTilemap("../assets/tilemaps/gynecology.json");
-    LoadAutoTile(&map, "../assets/tilesets/TileA4.png", (Vector2){256.0f, 320.0f});
-
-    Collusion collusion = CreateCollusion(&map);
-    SetupCollusion(&collusion, &map);
-
-    // const RenderTexture2D bakedMap = LoadRenderTexture(map.width * TILE_SIZE, map.height * TILE_SIZE);
-    // BeginTextureMode(bakedMap);
-    // ClearBackground(BLANK);
-    // EndTextureMode();
-
-    RenderTexture2D bakedMap = GenerateTilemapRenderTexture(&map);
-    
-    // Setup camera bounds based on tilemap
     GameCamera camera = InitGameCamera(screenWidth, screenHeight);
-    SetCameraBounds(&camera, &map);
 
-    // TEST TEXTURE
-    // Texture2D testTexture = LoadTexture("../assets/tilesets/TileA4.png");
+    Tilemap tilemap = LoadTilemapBinary("../assets/tilemaps/map.bin");
+
+    Collusion coll1 = CreateCollusion(&tilemap, 0);
+    SetupCollusion(&coll1, &tilemap, 0);
+
+    Collusion coll2 = CreateCollusion(&tilemap, 1);
+    SetupCollusion(&coll2, &tilemap, 1);
+
+    Collusion colls[] = {coll1, coll2};
+
+    const RenderTexture2D canvas = LoadRenderTexture(tilemap.width * tilemap.tileWidth, tilemap.height * tilemap.tileHeight);
+
+    BeginTextureMode(canvas);
+        ClearBackground(BLANK);
+        DrawTilemap(&tilemap);
+    EndTextureMode();
 
     SetTargetFPS(60);
 
+    float frameTime;
+
     while (!WindowShouldClose()) {
 
-        float frameTime = GetFrameTime();
+        frameTime = GetFrameTime();
 
-        UpdatePlayer(&player, frameTime, &collusion);
-        UpdateCamera2D(&camera, &player, &map);
+        UpdatePlayer(&player, frameTime, colls, 2);
+        UpdateCamera2D(&camera, &player, &tilemap, frameTime);
 
         BeginDrawing();
-        ClearBackground(BLACK);
+            ClearBackground(BLACK);
 
-        BeginMode2D(camera.camera);
-        
-        DrawTexturePro(
-            bakedMap.texture,
-            (Rectangle){ 0, 0, (float)bakedMap.texture.width, (float)-bakedMap.texture.height }, // Negatif height buat flip Y
-            (Rectangle){ 0, 0, (float)bakedMap.texture.width, (float)bakedMap.texture.height },
-            (Vector2){ 0, 0 },
-            0.0f,
-            WHITE
-        );
+            BeginMode2D(camera.camera);
 
-        DrawPlayer(&player);
+                DrawTexturePro(
+                    canvas.texture,
+                    (Rectangle){ 0, 0, (float)canvas.texture.width, -(float)canvas.texture.height },
+                    (Rectangle){ 0, 0, (float)canvas.texture.width, (float)canvas.texture.height },
+                    (Vector2){ 0, 0 },
+                    0.0f,
+                    WHITE
+                );
 
-        for (int i = 0; i < collusion.rectCount; i++) {
-            DrawRectangleLinesEx(collusion.rect[i], 1, RED);
-        }
-        EndMode2D();
+                // [DEBUG] Collusion
+                // for (int c = 0; c < 2; c++) {
+                //     for (int i = 0; i < colls[c].rectCount; i++) {
+                //         DrawRectangleLinesEx(colls[c].rect[i], 1, BLUE);
+                //     }
+                // }
 
+                DrawPlayer(&player);
+
+            EndMode2D();
         EndDrawing();
     }
 
-    UnloadRenderTexture(bakedMap);
-    // UnloadTexture(tileset);
-
-    UnloadTilemap(&map);
-    UnloadItem(shirt);
-    UnloadItem(pant);
-    UnloadItem(hair);
-
+    DestroyCollusion(&coll1);
+    DestroyCollusion(&coll2);
+    UnloadTilemap(&tilemap);
+    UnloadRenderTexture(canvas);
 
     CloseWindow();
     return 0;

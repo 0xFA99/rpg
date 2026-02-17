@@ -51,7 +51,7 @@ typedef struct {
 
 Player InitPlayer(void);
 int GetSpriteRow(const Player *player);
-void UpdatePlayer(Player *player, float frameTime, const Collusion *collusion);
+void UpdatePlayer(Player *player, float frameTime, const Collusion *collusion, int count);
 void DrawPlayer(const Player *player);
 
 void PlayerEquipItem(Player *p, Item newItem);

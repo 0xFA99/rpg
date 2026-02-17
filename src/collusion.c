@@ -1,25 +1,38 @@
-#include "collusion.h"
-
 #include <assert.h>
 #include <stdlib.h>
 
-Collusion CreateCollusion(const Tilemap *tilemap)
+#include "collusion.h"
+#include "tilemap.h"
+
+static bool
+IsSolidTile(const Tilemap *tilemap, const int layerIndex, const int x, const int y)
+{
+    const TileLayer *layer = &tilemap->layers[layerIndex];
+    if (x < 0 || x >= layer->width || y < 0 || y >= layer->height) return false;
+
+    if (layer->data[y * layer->width + x] <= 0) return false;
+
+    const TileType type = GetTileType(tilemap, layerIndex, x, y);
+    return type == TILE_BORDER || type == TILE_WALL || type == TILE_COLLUSION;
+}
+
+Collusion CreateCollusion(const Tilemap *tilemap, const int layerIndex)
 {
     assert(tilemap != NULL && "[ERROR] Tilemap not found!\n");
-    const TileLayer *layer = &tilemap->layers[LAYER_COLLUSION];
+    const TileLayer *layer = &tilemap->layers[layerIndex];
 
     bool *visited = calloc(layer->width * layer->height, sizeof(bool));
     unsigned int totalRect = 0;
 
     for (int y = 0; y < layer->height; y++) {
         for (int x = 0; x < layer->width; x++) {
-            if (layer->data[y * layer->width + x] > 0 && !visited[y * layer->width + x]) {
+            if (IsSolidTile(tilemap, layerIndex, x, y) && !visited[y * layer->width + x]) {
                 totalRect++;
 
                 int currentW = 1;
-                while (x + 1 < layer->width && layer->data[y * layer->width + (x + currentW)] > 0 &&
-                        !visited[y * layer->width + (x + currentW)]) {
-
+                while (x + currentW < layer->width &&
+                       IsSolidTile(tilemap, layerIndex, x + currentW, y) &&
+                       !visited[y * layer->width + (x + currentW)]) {
                     currentW++;
                 }
 
@@ -27,15 +40,14 @@ Collusion CreateCollusion(const Tilemap *tilemap)
                 while (y + currentH < layer->height) {
                     bool canExpand = true;
                     for (int i = 0; i < currentW; i++) {
-                        if (layer->data[(y + currentH) * layer->width + (x + i)] == 0 ||
+                        if (!IsSolidTile(tilemap, layerIndex, x + i, y + currentH) ||
                             visited[(y + currentH) * layer->width + (x + i)]) {
-
                             canExpand = false;
                             break;
                         }
                     }
 
-                    if (canExpand) currentW++;
+                    if (canExpand) currentH++;
                     else break;
                 }
 
@@ -58,22 +70,22 @@ Collusion CreateCollusion(const Tilemap *tilemap)
     return collusion;
 }
 
-void SetupCollusion(Collusion *collusion, const Tilemap *tilemap)
+void SetupCollusion(Collusion *collusion, const Tilemap *tilemap, const int layerIndex)
 {
     if (!collusion || !tilemap) return;
-    const TileLayer *layer = &tilemap->layers[LAYER_COLLUSION];
+    const TileLayer *layer = &tilemap->layers[layerIndex];
 
     bool *visited = calloc(layer->width * layer->height, sizeof(bool));
     int rectIdx = 0;
 
     for (int y = 0; y < layer->height; y++) {
         for (int x = 0; x < layer->width; x++) {
-
-            if (layer->data[y * layer->width + x] > 0 && !visited[y * layer->width + x]) {
+            if (IsSolidTile(tilemap, layerIndex, x, y) && !visited[y * layer->width + x]) {
 
                 int currentW = 1;
-                while (x + currentW < layer->width && layer->data[y * layer->width + (x + currentW)] > 0 &&
-                        !visited[y * layer->width + (x + currentW)]) {
+                while (x + currentW < layer->width &&
+                       IsSolidTile(tilemap, layerIndex, x + currentW, y) &&
+                       !visited[y * layer->width + (x + currentW)]) {
                     currentW++;
                 }
 
@@ -81,13 +93,12 @@ void SetupCollusion(Collusion *collusion, const Tilemap *tilemap)
                 while (y + currentH < layer->height) {
                     bool canExpand = true;
                     for (int i = 0; i < currentW; i++) {
-                        if (layer->data[(y + currentH) * layer->width + (x + i)] == 0 ||
+                        if (!IsSolidTile(tilemap, layerIndex, x + i, y + currentH) ||
                             visited[(y + currentH) * layer->width + (x + i)]) {
                             canExpand = false;
                             break;
                         }
                     }
-
                     if (canExpand) currentH++;
                     else break;
                 }
@@ -98,16 +109,16 @@ void SetupCollusion(Collusion *collusion, const Tilemap *tilemap)
                     }
                 }
 
-                collusion->rect[rectIdx].x = (float)x* TILE_SIZE;
-                collusion->rect[rectIdx].y = (float)y * TILE_SIZE;
-                collusion->rect[rectIdx].width = (float)currentW * TILE_SIZE;
-                collusion->rect[rectIdx].height = (float)currentH * TILE_SIZE;
-
-                rectIdx++;
+                if (rectIdx < collusion->rectCount) {
+                    collusion->rect[rectIdx].x = (float)x * 32;
+                    collusion->rect[rectIdx].y = (float)y * 32;
+                    collusion->rect[rectIdx].width = (float)currentW * 32;
+                    collusion->rect[rectIdx].height = (float)currentH * 32;
+                    rectIdx++;
+                }
             }
         }
     }
-
     free(visited);
 }
 
