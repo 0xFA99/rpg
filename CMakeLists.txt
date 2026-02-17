@@ -15,15 +15,14 @@ set(SOURCES
         src/game.c
         src/tilemap.c
         src/camera.c
-        src/helper.c
         src/collusion.c
 )
 
 add_executable(rpg ${SOURCES})
 if(WIN32)
-    target_link_libraries(rpg raylib cjson)
+    target_link_libraries(rpg raylib)
 else()
-    target_link_libraries(rpg raylib cjson m)
+    target_link_libraries(rpg raylib m)
 endif()
 
 set_target_properties(rpg PROPERTIES
@@ -41,3 +40,9 @@ if(WIN32)
     set_target_properties(rpg PROPERTIES
         VS_DEBUGLER_WORKING_DIRECTORY $<TARGET_FILE_DIR:rpg>)
 endif()
+
+add_custom_command(TARGET rpg POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:rpg>/assets"
+)
