@@ -3,6 +3,7 @@
 
 #define MAX_STRING      1024
 #define SHORT_STRING    256
+#define TILE_SIZE        32
 
 #include "raylib.h"
 
@@ -39,7 +40,6 @@ typedef struct {
 } Item;
 
 Item LoadItem(const char *filename, EquipSlot slot, const char *label);
-void UnloadItem(Item item);
 
 Texture2D LoadTextureFromBin(const char *fileName);
 

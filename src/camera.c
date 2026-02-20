@@ -64,21 +64,3 @@ void UpdateCamera2D(GameCamera *camera, const Player *player, const Tilemap *map
     else camera->camera.target.y = Clamp(camera->camera.target.y, viewSize.y / 2.0f, mapH - (viewSize.y / 2.0f));
 }
 
-void SetCameraBounds(GameCamera* camera, const Tilemap* map) {
-    if (!camera || !map) return;
-    
-    camera->boundsMin = (Vector2){ 0.0f, 0.0f };
-    camera->boundsMax = (Vector2){ 
-        (float)(map->width * map->tileWidth),
-        (float)(map->height * map->tileHeight)
-    };
-}
-
-void SetCameraZoom(GameCamera* camera, float zoom) {
-    if (!camera) return;
-    
-    if (zoom < 0.5f) zoom = 0.5f;
-    if (zoom > 3.0f) zoom = 3.0f;
-    
-    camera->zoom = zoom;
-}

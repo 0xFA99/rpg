@@ -1,8 +1,9 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "collusion.h"
-#include "tilemap.h"
+#include "game.h"
 
 static bool
 IsSolidTile(const Tilemap *tilemap, const int layerIndex, const int x, const int y)
@@ -16,19 +17,20 @@ IsSolidTile(const Tilemap *tilemap, const int layerIndex, const int x, const int
     return type == TILE_BORDER || type == TILE_WALL || type == TILE_COLLUSION || type == TILE_TABLE;
 }
 
-Collusion CreateCollusion(const Tilemap *tilemap, const int layerIndex)
+Collusion InitCollusion(const Tilemap *tilemap, const int layerIndex)
 {
     assert(tilemap != NULL && "[ERROR] Tilemap not found!\n");
     const TileLayer *layer = &tilemap->layers[layerIndex];
 
+    Collusion collusion = {0};
+    collusion.rect = NULL;
+    collusion.rectCount = 0;
+
     bool *visited = calloc(layer->width * layer->height, sizeof(bool));
-    unsigned int totalRect = 0;
 
     for (int y = 0; y < layer->height; y++) {
         for (int x = 0; x < layer->width; x++) {
             if (IsSolidTile(tilemap, layerIndex, x, y) && !visited[y * layer->width + x]) {
-                totalRect++;
-
                 int currentW = 1;
                 while (x + currentW < layer->width &&
                        IsSolidTile(tilemap, layerIndex, x + currentW, y) &&
@@ -46,7 +48,6 @@ Collusion CreateCollusion(const Tilemap *tilemap, const int layerIndex)
                             break;
                         }
                     }
-
                     if (canExpand) currentH++;
                     else break;
                 }
@@ -56,28 +57,18 @@ Collusion CreateCollusion(const Tilemap *tilemap, const int layerIndex)
                         visited[(y + row) * layer->width + (x + col)] = true;
                     }
                 }
+
+                collusion.rectCount++;
             }
         }
     }
 
-    free(visited);
-
-    Collusion collusion = {0};
-    collusion.rectCount = totalRect;
-    collusion.rect = malloc(totalRect * sizeof(Rectangle));
+    collusion.rect = malloc(collusion.rectCount * sizeof(Rectangle));
     assert(collusion.rect != NULL && "[ERROR] Failed alloc collusion!\n");
 
-    return collusion;
-}
+    memset(visited, 0, layer->width * layer->height * sizeof(bool));
 
-void SetupCollusion(Collusion *collusion, const Tilemap *tilemap, const int layerIndex)
-{
-    if (!collusion || !tilemap) return;
-    const TileLayer *layer = &tilemap->layers[layerIndex];
-
-    bool *visited = calloc(layer->width * layer->height, sizeof(bool));
     int rectIdx = 0;
-
     for (int y = 0; y < layer->height; y++) {
         for (int x = 0; x < layer->width; x++) {
             if (IsSolidTile(tilemap, layerIndex, x, y) && !visited[y * layer->width + x]) {
@@ -109,23 +100,22 @@ void SetupCollusion(Collusion *collusion, const Tilemap *tilemap, const int laye
                     }
                 }
 
-                if (rectIdx < collusion->rectCount) {
-                    collusion->rect[rectIdx].x = (float)x * 32;
-                    collusion->rect[rectIdx].y = (float)y * 32;
-                    collusion->rect[rectIdx].width = (float)currentW * 32;
-                    collusion->rect[rectIdx].height = (float)currentH * 32;
-                    rectIdx++;
-                }
+                collusion.rect[rectIdx].x = (float)x * TILE_SIZE;
+                collusion.rect[rectIdx].y = (float)y * TILE_SIZE;
+                collusion.rect[rectIdx].width = (float)currentW * TILE_SIZE;
+                collusion.rect[rectIdx].height = (float)currentH * TILE_SIZE;
+                rectIdx++;
             }
         }
     }
+
     free(visited);
+    return collusion;
 }
 
 void DestroyCollusion(Collusion *collusion)
 {
     if (collusion->rect) free(collusion->rect);
-    collusion->rect = 0;
-    collusion->width = 0;
-    collusion->height = 0;
+    collusion->rect = NULL;
+    collusion->rectCount = 0;
 }

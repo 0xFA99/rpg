@@ -1,8 +1,6 @@
 #include "player.h"
 #include "collusion.h"
 
-#define TILE_SIZE 32
-
 Player InitPlayer(void) {
   Player player = {0};
 
@@ -22,10 +20,44 @@ Player InitPlayer(void) {
 
   player.movement.tilePosition = (Vector2){9.0f, 4.0f};
   player.movement.targetTilePosition = player.movement.tilePosition;
-  player.movement.actualPosition =
+  player.movement.position =
       (Vector2){player.movement.tilePosition.x * TILE_SIZE,
                 player.movement.tilePosition.y * TILE_SIZE};
-  player.movement.position = player.movement.actualPosition;
+  player.movement.moveTimer = 0.0f;
+  player.movement.moveDuration = 0.15f;
+  player.movement.isMoving = false;
+  player.movement.isHoldingKey = false;
+  player.movement.movementSpeed = 1.0f;
+
+  player.movement.holdDelay = 0.15f;
+  player.movement.holdTimer = 0.0f;
+  player.movement.justTurned = false;
+
+  return player;
+}
+
+Player InitPlayerAt(int spawnX, int spawnY) {
+  Player player = {0};
+
+  player.graphics.action = ACTION_IDLE;
+  player.graphics.direction = DIRECTION_FRONT;
+  player.graphics.frameSize = (Vector2){64.0f, 64.0f};
+  player.graphics.headTexture =
+      LoadTextureFromBin("assets/characters/ivy/ivy_head_good.bin");
+  player.graphics.bodyTexture =
+      LoadTextureFromBin("assets/characters/ivy/ivy_body_base.bin");
+
+  player.equipment.equippedFlags = 0;
+
+  player.animation.currentFrame = 0;
+  player.animation.frameTimer = 0.0f;
+  player.animation.frameDirection = 1;
+
+  player.movement.tilePosition = (Vector2){(float)spawnX, (float)spawnY};
+  player.movement.targetTilePosition = player.movement.tilePosition;
+  player.movement.position =
+      (Vector2){(float)spawnX * TILE_SIZE,
+                (float)spawnY * TILE_SIZE};
   player.movement.moveTimer = 0.0f;
   player.movement.moveDuration = 0.15f;
   player.movement.isMoving = false;
@@ -300,11 +332,7 @@ void PlayerEquipItem(Player *p, const Item newItem) {
   }
 }
 
-void PlayerUnequipItem(Player *p, const EquipSlot slot) {
-  if (slot < MAX_SLOTS) {
-    p->equipment.equippedFlags &= ~(1 << slot);
-  }
-}
+
 
 bool PlayerIsEquipItem(const Player *p, const EquipSlot slot) {
   return slot < MAX_SLOTS && p->equipment.equippedFlags & 1 << slot;

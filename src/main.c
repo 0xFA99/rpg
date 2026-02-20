@@ -2,39 +2,37 @@
 #include "raylib.h"
 #include "tilemap.h"
 
-int main(void) {
+int main(void)
+{
   const int screenWidth = 800;
   const int screenHeight = 600;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
   InitWindow(screenWidth, screenHeight, "RPG Game");
 
-  Item hair =
-      LoadItem("assets/characters/ivy/ivy_hair_basic.bin", SLOT_HAIR, "hair");
-  Item shirt =
-      LoadItem("assets/characters/ivy/ivy_shirt_basic.bin", SLOT_TOP, "shirt");
-  Item bottom = LoadItem("assets/characters/ivy/ivy_bottom_basic.bin",
-                         SLOT_BOTTOM, "bottom");
+  Item hair     = LoadItem("assets/characters/ivy/ivy_hair_basic.bin",      SLOT_HAIR, "hair");
+  Item shirt    = LoadItem("assets/characters/ivy/ivy_shirt_basic.bin",     SLOT_TOP, "shirt");
+  Item bottom   = LoadItem("assets/characters/ivy/ivy_bottom_basic.bin",    SLOT_BOTTOM, "bottom");
+
   // Item sword      = LoadItem("../assets/weapons/short_sword.bin",
   // SLOT_HAND_MAIN, "sword"); Item lantern    =
   // LoadItem("../assets/weapons/lantern.bin", SLOT_HAND_OFF, "lantern");
 
-  Player player = InitPlayer();
+  // Load map first to get spawn point
+  Tilemap tilemap = LoadTilemapById(1);
+
+  Player player = InitPlayerAt(tilemap.spawnPointX, tilemap.spawnPointY);
   PlayerEquipItem(&player, hair);
   PlayerEquipItem(&player, shirt);
   PlayerEquipItem(&player, bottom);
+
   // PlayerEquipItem(&player, sword);
   // PlayerEquipItem(&player, lantern);
 
   GameCamera camera = InitGameCamera(screenWidth, screenHeight);
 
-  Tilemap tilemap = LoadTilemapBinary("assets/tilemaps/map.bin");
-
-  Collusion coll1 = CreateCollusion(&tilemap, 0);
-  SetupCollusion(&coll1, &tilemap, 0);
-
-  Collusion coll2 = CreateCollusion(&tilemap, 1);
-  SetupCollusion(&coll2, &tilemap, 1);
+  Collusion coll1 = InitCollusion(&tilemap, 0);
+  Collusion coll2 = InitCollusion(&tilemap, 1);
 
   Collusion colls[] = {coll1, coll2};
 

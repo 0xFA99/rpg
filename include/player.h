@@ -22,16 +22,13 @@ typedef struct {
 typedef struct {
     float       frameTimer;
     int         currentFrame;
-    int         maxFrames;
     int         frameDirection;
 } PlayerAnimation;
 
 typedef struct {
     Vector2     position;
-    Vector2     velocity;
     Vector2     tilePosition;
     Vector2     targetTilePosition;
-    Vector2     actualPosition;
     float       moveDuration;
     float       movementSpeed;
     float       moveTimer;
@@ -50,12 +47,12 @@ typedef struct {
 } Player;
 
 Player InitPlayer(void);
+Player InitPlayerAt(int spawnX, int spawnY);
 int GetSpriteRow(const Player *player);
 void UpdatePlayer(Player *player, float frameTime, const Collusion *collusion, int count);
 void DrawPlayer(const Player *player);
 
 void PlayerEquipItem(Player *p, Item newItem);
-void PlayerUnequipItem(Player *p, EquipSlot slot);
 
 bool PlayerIsEquipItem(const Player *p, EquipSlot slot);
 

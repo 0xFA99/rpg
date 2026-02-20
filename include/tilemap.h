@@ -5,13 +5,13 @@
 #include "raylib.h"
 
 typedef enum {
-    TILE_NONE = 0,  // 0
-    TILE_GROUND,    // 1
-    TILE_WALL,      // 2
-    TILE_BORDER,    // 3
-    TILE_COLLUSION, // 4
-    TILE_CARPET,    // 5
-    TILE_TABLE      // 6
+    TILE_NONE = 0,
+    TILE_GROUND,
+    TILE_WALL,
+    TILE_BORDER,
+    TILE_COLLUSION,
+    TILE_CARPET,
+    TILE_TABLE
 } TileType;
 
 typedef struct {
@@ -34,28 +34,29 @@ typedef struct {
 } TileLayer;
 
 typedef struct {
-    // Map dimensions
     int width;
     int height;
     int tileWidth;
     int tileHeight;
 
-    // Tileset data
     Tileset *tilesets;
     int tilesetCount;
 
-    // Layer data
     TileLayer *layers;
     int layerCount;
+
+    int mapId;
+    int spawnPointX;
+    int spawnPointY;
 } Tilemap;
 
+Tilemap LoadTilemapBinary(const char *binPath);
+Tilemap LoadTilemapById(int mapId);
 
-Tilemap LoadTilemapBinary(const char *jsonPath);
 void UnloadTilemap(Tilemap *tilemap);
 
 void DrawTilemap(const Tilemap *tilemap);
 
-bool IsTileWalkable(const Tilemap *tilemap, int x, int y);
 TileType GetTileType(const Tilemap *tilemap, int layerIndex, int x, int y);
 
 #endif

@@ -72,6 +72,11 @@ Tilemap LoadTilemapBinary(const char *jsonPath)
     read_exact(f, &tilemap.tileHeight,  sizeof(int), "tileHeight");
     read_exact(f, &tilemap.tilesetCount,sizeof(int), "tilesetCount");
     read_exact(f, &tilemap.layerCount,  sizeof(int), "layerCount");
+    read_exact(f, &tilemap.mapId,      sizeof(int), "mapId");
+
+    // ── MAP PROPERTIES ───────────────────────────────────────────────────────
+    read_exact(f, &tilemap.spawnPointX, sizeof(int), "spawnPointX");
+    read_exact(f, &tilemap.spawnPointY, sizeof(int), "spawnPointY");
 
     tilemap.tilesets = (Tileset *)calloc(tilemap.tilesetCount, sizeof(Tileset));
     if (!tilemap.tilesets) { TraceLog(LOG_ERROR, "[Tilemap] Out of memory for tilesets"); exit(1); }
@@ -118,6 +123,13 @@ Tilemap LoadTilemapBinary(const char *jsonPath)
 
     fclose(f);
     return tilemap;
+}
+
+Tilemap LoadTilemapById(int mapId)
+{
+    char path[SHORT_STRING];
+    snprintf(path, SHORT_STRING, "assets/tilemaps/map_%d.bin", mapId);
+    return LoadTilemapBinary(path);
 }
 
 void UnloadTilemap(Tilemap *tilemap)
@@ -228,7 +240,7 @@ DrawWallTile(const Tilemap *tilemap, const Tileset *tileset,
 }
 
 static void
-DrawDecorationTile(const Tilemap *tilemap, const Tileset *tileset,
+DrawCarpetTile(const Tilemap *tilemap, const Tileset *tileset,
              const Rectangle src, const Vector2 pos,
              const int x, const int y)
 {
@@ -243,34 +255,80 @@ DrawDecorationTile(const Tilemap *tilemap, const Tileset *tileset,
     const float pY = pos.y;
 
     // Center fill
-    if (typeE == TILE_CARPET || typeE == TILE_TABLE)
+    if (typeE == TILE_CARPET)
         DrawTilePart(&tileset->texture, sX + TILE_HALF, sY + TILE_SIZE + TILE_HALF, TILE_SIZE, TILE_SIZE, pX, pY);
 
     // Edges
-    if (typeE != TILE_CARPET && typeE != TILE_TABLE)
+    if (typeE != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX + TILE_SIZE, sY + TILE_SIZE + TILE_HALF, TILE_SIZE, TILE_SIZE, pX, pY);
 
-    if (typeW != TILE_CARPET && typeW != TILE_TABLE)
+    if (typeW != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX, sY + TILE_SIZE + TILE_HALF, TILE_SIZE, TILE_SIZE, pX, pY);
 
-    if (typeN != TILE_CARPET && typeN != TILE_TABLE)
+    if (typeN != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX + TILE_HALF, sY + TILE_SIZE, TILE_SIZE, TILE_HALF, pX, pY);
 
-    if (typeS != TILE_CARPET && typeS != TILE_TABLE)
+    if (typeS != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX + TILE_HALF, sY + TILE_SIZE * 2 + TILE_HALF, TILE_SIZE, TILE_HALF, pX, pY + TILE_HALF);
 
     // Corners
-    if (typeN != TILE_CARPET && typeE != TILE_CARPET && typeN != TILE_TABLE && typeE != TILE_TABLE)
+    if (typeN != TILE_CARPET && typeE != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX + TILE_SIZE + TILE_HALF, sY + TILE_SIZE, TILE_HALF, TILE_HALF, pX + TILE_HALF, pY);
 
-    if (typeN != TILE_CARPET && typeW != TILE_CARPET && typeN != TILE_TABLE && typeW != TILE_TABLE)
+    if (typeN != TILE_CARPET && typeW != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX, sY + TILE_SIZE, TILE_HALF, TILE_HALF, pX, pY);
 
-    if (typeS != TILE_CARPET && typeE != TILE_CARPET && typeS != TILE_TABLE && typeE != TILE_TABLE)
+    if (typeS != TILE_CARPET && typeE != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX + TILE_SIZE + TILE_HALF, sY + 2 * TILE_SIZE + TILE_HALF, TILE_HALF, TILE_HALF, pX + TILE_HALF, pY + TILE_HALF);
 
-    if (typeS != TILE_CARPET && typeW != TILE_CARPET && typeS != TILE_TABLE && typeW != TILE_TABLE)
+    if (typeS != TILE_CARPET && typeW != TILE_CARPET)
         DrawTilePart(&tileset->texture, sX, sY + 2 * TILE_SIZE + TILE_HALF, TILE_HALF, TILE_HALF, pX, pY + TILE_HALF);
+}
+
+static void
+DrawTableTile(const Tilemap *tilemap, const Tileset *tileset,
+             const Rectangle src, const Vector2 pos,
+             const int x, const int y)
+{
+    const TileType typeN = GetTileType(tilemap, 1, x, y - 1);
+    const TileType typeS = GetTileType(tilemap, 1, x, y + 1);
+    const TileType typeE = GetTileType(tilemap, 1, x + 1, y);
+    const TileType typeW = GetTileType(tilemap, 1, x - 1, y);
+
+    const float sX = src.x;
+    const float sY = src.y;
+    const float pX = pos.x;
+    const float pY = pos.y;
+
+    // Center fill
+    if (typeE == TILE_TABLE)
+        DrawTilePart(&tileset->texture, sX + TILE_HALF, sY + TILE_SIZE * 2.0f - 8.0f, TILE_SIZE, TILE_SIZE, pX + TILE_HALF, pY);
+
+    // Edges
+    if (typeE != TILE_TABLE)
+        DrawTilePart(&tileset->texture, sX + TILE_SIZE + TILE_HALF, sY + TILE_SIZE * 2.0f - 8.0f, TILE_HALF, TILE_SIZE, pX + TILE_HALF, pY);
+
+    if (typeW != TILE_TABLE)
+        DrawTilePart(&tileset->texture, sX, sY + TILE_SIZE * 2.0f - 8.0f, TILE_HALF, TILE_SIZE, pX, pY);
+
+    // if (typeN != TILE_TABLE)
+    //     DrawTilePart(&tileset->texture, sX + TILE_HALF, sY + TILE_SIZE, TILE_SIZE, TILE_HALF, pX, pY - TILE_HALF);
+
+    if (typeS != TILE_TABLE)
+        DrawTilePart(&tileset->texture, sX + TILE_HALF, sY + TILE_SIZE * 3.0f - 8.0f, TILE_SIZE, 8.0f, pX, pY + TILE_SIZE);
+
+    // Corners
+    // if (typeN != TILE_TABLE && typeE != TILE_TABLE)
+    //     DrawTilePart(&tileset->texture, sX + TILE_SIZE + TILE_HALF, sY + TILE_SIZE, TILE_HALF, TILE_HALF, pX + TILE_HALF, pY);
+
+    // if (typeN != TILE_TABLE && typeW != TILE_TABLE)
+    //     DrawTilePart(&tileset->texture, sX, sY + TILE_SIZE, TILE_HALF, TILE_HALF, pX, pY);
+
+    if (typeS != TILE_TABLE && typeE != TILE_TABLE)
+        DrawTilePart(&tileset->texture, sX + TILE_SIZE * 2.0f - 8.0f, sY + TILE_SIZE * 3.0f - 8.0f, 8.0f, 8.0f, pX + TILE_SIZE - 8.0f, pY + TILE_SIZE);
+
+    if (typeS != TILE_TABLE && typeW != TILE_TABLE)
+        DrawTilePart(&tileset->texture, sX, sY + TILE_SIZE * 3.0f - 8.0f, 8.0f, 8.0f, pX, pY + TILE_SIZE);
 }
 
 static void
@@ -342,7 +400,6 @@ void DrawTilemap(const Tilemap *tilemap)
                     .y = (float)(y * tilemap->tileHeight)
                 };
 
-                // Get tile type
                 TileType type = TILE_GROUND;
                 if (ts->properties && ts->propertyCount > 0) {
                     for (int i = 0; i < ts->propertyCount; i++) {
@@ -353,15 +410,58 @@ void DrawTilemap(const Tilemap *tilemap)
                     }
                 }
 
+                if (type == TILE_BORDER) continue;
+
                 switch (type)
                 {
                     case TILE_WALL: DrawWallTile(tilemap, ts, src, pos, x, y); break;
-                    case TILE_BORDER: DrawBorderTile(tilemap, ts, src, pos, x, y); break;
-
-                    case TILE_CARPET:
-                    case TILE_TABLE: DrawDecorationTile(tilemap, ts, src, pos, x, y); break;
-
+                    case TILE_CARPET: DrawCarpetTile(tilemap, ts, src, pos, x, y); break;
+                    case TILE_TABLE: DrawTableTile(tilemap, ts, src, pos, x, y); break;
                     default: DrawTextureRec(ts->texture, src, pos, WHITE); break;
+                }
+            }
+        }
+    }
+
+    for (int l = 0; l < tilemap->layerCount; l++) {
+        const TileLayer *layer = &tilemap->layers[l];
+
+        for (int y = 0; y < layer->height; y++) {
+            for (int x = 0; x < layer->width; x++) {
+                const unsigned int gid = layer->data[y * layer->width + x];
+                if (gid == 0) continue;
+
+                const int tsIndex = FindTilesetIndex(tilemap, gid);
+                if (tsIndex == -1) continue;
+
+                const Tileset *ts = &tilemap->tilesets[tsIndex];
+                const int localId = (int)gid - ts->firstGid;
+                const int tilesPerRow = ts->texture.width / tilemap->tileWidth;
+
+                const Rectangle src = {
+                    .x = (float)(localId % tilesPerRow) * (float)tilemap->tileWidth,
+                    .y = localId / tilesPerRow * (float)tilemap->tileHeight,
+                    .width  = (float)tilemap->tileWidth,
+                    .height = (float)tilemap->tileHeight
+                };
+
+                const Vector2 pos = {
+                    .x = (float)(x * tilemap->tileWidth),
+                    .y = (float)(y * tilemap->tileHeight)
+                };
+
+                TileType type = TILE_GROUND;
+                if (ts->properties && ts->propertyCount > 0) {
+                    for (int i = 0; i < ts->propertyCount; i++) {
+                        if (ts->properties[i].id == localId) {
+                            type = ts->properties[i].type;
+                            break;
+                        }
+                    }
+                }
+
+                if (type == TILE_BORDER) {
+                    DrawBorderTile(tilemap, ts, src, pos, x, y);
                 }
             }
         }
@@ -396,8 +496,4 @@ TileType GetTileType(const Tilemap *tilemap, const int layerIndex,
     return TILE_NONE;
 }
 
-bool IsTileWalkable(const Tilemap *tilemap, const int x, const int y)
-{
-    const TileType type = GetTileType(tilemap, 0, x, y);
-    return type != TILE_WALL;
-}
+

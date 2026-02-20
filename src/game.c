@@ -14,9 +14,7 @@ Item LoadItem(const char *filename, const EquipSlot slot, const char *label)
     return item;
 }
 
-void UnloadItem(const Item item) {
-    UnloadTexture(item.texture);
-}
+
 
 Texture2D LoadTextureFromBin(const char *fileName)
 {
