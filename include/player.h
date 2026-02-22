@@ -9,6 +9,18 @@
 #include "item.h"
 
 typedef struct {
+    Texture2D head;
+    Texture2D hair;
+    Texture2D subHair;
+    Texture2D eyes;
+    Texture2D mouth;
+    Texture2D body;
+    Texture2D shirt;
+    Texture2D pant;
+    Texture2D panty;
+} PlayerPortrait;
+
+typedef struct {
     Texture2D   headTexture;
     Texture2D   bodyTexture;
     Direction   direction;
@@ -47,13 +59,14 @@ typedef struct Player {
     PlayerEquipment  equipment;
     PlayerAnimation  animation;
     PlayerMovement   movement;
+    PlayerPortrait   portrait;
 } Player;
 
 
-Player       InitPlayer(void);
-Player       InitPlayerAt(int spawnX, int spawnY);
+Player      *InitPlayer(void);
 void         UpdatePlayer(Player *player, float frameTime, const Collision *collision, const Tilemap *tilemap);
 void         DrawPlayer(const Player *player);
+void         UnloadPlayer(Player *player);
 
 void         PlayerEquipItem(Player *p, const Item *item);
 void         PlayerUnequipItem(Player *p, EquipSlot slot);
