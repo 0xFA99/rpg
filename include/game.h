@@ -42,9 +42,15 @@ typedef struct {
     Collision *collision;
 
     RenderTexture2D canvas;
+    RenderTexture2D portrait;
     bool canvasInitialized;
+    bool portraitInitialized;
+
     float transAlpha;
     int pendingMapId;
+    bool isTransitioning;
+    bool transitionFadeOut;
+    float transitionSpeed;
 } ScreenGameplayData;
 
 typedef struct {
@@ -56,9 +62,9 @@ typedef struct {
 } ScreenOptionsData;
 
 struct GameState {
-    bool gameRunning;
-    Screen currentScreen;
-    float frameTime;
+    bool    gameRunning;
+    Screen  currentScreen;
+    float   frameTime;
 };
 
 Texture2D LoadTextureFromBin(const char *fileName);
@@ -79,6 +85,5 @@ void ScreenOptionsDraw(const Screen *s);
 void ScreenOptionsUnload(const Screen *s);
 
 void UpdateScreen(Screen *s);
-
 
 #endif
