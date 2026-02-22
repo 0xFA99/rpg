@@ -1,7 +1,6 @@
 #ifndef TILEMAP_H
 #define TILEMAP_H
 
-#include <stdbool.h>
 #include "raylib.h"
 
 typedef enum {
@@ -15,47 +14,56 @@ typedef enum {
 } TileType;
 
 typedef struct {
-    int id;
-    TileType type;
-} TileProperties;
+    int          id;
+    TileType     type;
+} TileProp;
 
 typedef struct {
-    Texture2D texture;
-    char *texturePath;
-    int firstGid;
-    TileProperties *properties;
-    int propertyCount;
+    Texture2D    texture;
+    char        *texturePath;
+    TileProp    *properties;
+    int          firstGid;
+    int          propertyCount;
 } Tileset;
 
 typedef struct {
-    unsigned int *data;
-    int width;
-    int height;
+    int         *data;
+    int          width;
+    int          height;
 } TileLayer;
 
 typedef struct {
-    int width;
-    int height;
-    int tileWidth;
-    int tileHeight;
+    Tileset     *tilesets;
+    TileLayer   *layers;
 
-    Tileset *tilesets;
-    int tilesetCount;
+    int          width;
+    int          height;
+    int          tileWidth;
+    int          tileHeight;
 
-    TileLayer *layers;
-    int layerCount;
+    int          tilesetCount;
+    int          layerCount;
+    int          mapId;
 
-    int mapId;
-    int spawnPointX;
-    int spawnPointY;
+    int          spawnPointX;
+    int          spawnPointY;
+    int          eventGotoMapId;
+    int          eventGotoMapTileX;
+    int          eventGotoMapTileY;
 } Tilemap;
 
-Tilemap LoadTilemapBinary(const char *binPath);
-Tilemap LoadTilemapById(int mapId);
+typedef struct {
+    Rectangle        src;
+    Vector2          pos;
+    TileType         type;
+    const Tileset   *tileset;
+} TileDrawInfo;
 
-void UnloadTilemap(Tilemap *tilemap);
+Tilemap *LoadTilemapBinary(const char *binPath);
+Tilemap *LoadTilemapById(int mapId);
 
-void DrawTilemap(const Tilemap *tilemap);
+void     UnloadTilemap(Tilemap *tilemap);
+void     DrawTilemap(const Tilemap *tilemap);
 
 TileType GetTileType(const Tilemap *tilemap, int layerIndex, int x, int y);
 

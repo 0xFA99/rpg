@@ -1,10 +1,12 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include "game.h"
-
 #include <stdint.h>
-#include "collusion.h"
+
+#include "collision.h"
+#include "tilemap.h"
+#include "game_types.h"
+#include "item.h"
 
 typedef struct {
     Texture2D   headTexture;
@@ -15,7 +17,7 @@ typedef struct {
 } PlayerGraphics;
 
 typedef struct {
-    Texture2D   equippedTextures[MAX_SLOTS];
+    Item        equipped[MAX_SLOTS];
     uint16_t    equippedFlags;
 } PlayerEquipment;
 
@@ -37,23 +39,29 @@ typedef struct {
     bool        isHoldingKey;
     bool        justTurned;
     bool        isMoving;
+    bool        justTriggeredEvent;
 } PlayerMovement;
 
-typedef struct {
+typedef struct Player {
     PlayerGraphics   graphics;
     PlayerEquipment  equipment;
     PlayerAnimation  animation;
     PlayerMovement   movement;
 } Player;
 
-Player InitPlayer(void);
-Player InitPlayerAt(int spawnX, int spawnY);
-int GetSpriteRow(const Player *player);
-void UpdatePlayer(Player *player, float frameTime, const Collusion *collusion, int count);
-void DrawPlayer(const Player *player);
 
-void PlayerEquipItem(Player *p, Item newItem);
+Player       InitPlayer(void);
+Player       InitPlayerAt(int spawnX, int spawnY);
+void         UpdatePlayer(Player *player, float frameTime, const Collision *collision, const Tilemap *tilemap);
+void         DrawPlayer(const Player *player);
 
-bool PlayerIsEquipItem(const Player *p, EquipSlot slot);
+void         PlayerEquipItem(Player *p, const Item *item);
+void         PlayerUnequipItem(Player *p, EquipSlot slot);
+bool         PlayerIsEquipped(const Player *p, EquipSlot slot);
+const Item  *PlayerGetEquippedItem(const Player *p, EquipSlot slot);
+
+bool         TryTriggerTileEvent(const Player *player, const Tilemap *tilemap);
+int          GetSpriteRow(const Player *player);
+
 
 #endif

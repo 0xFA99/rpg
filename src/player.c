@@ -1,339 +1,360 @@
 #include "player.h"
-#include "collusion.h"
+
+#include "game.h"
+#include "collision.h"
 
 Player InitPlayer(void) {
-  Player player = {0};
-
-  player.graphics.action = ACTION_IDLE;
-  player.graphics.direction = DIRECTION_FRONT;
-  player.graphics.frameSize = (Vector2){64.0f, 64.0f};
-  player.graphics.headTexture =
-      LoadTextureFromBin("assets/characters/ivy/ivy_head_good.bin");
-  player.graphics.bodyTexture =
-      LoadTextureFromBin("assets/characters/ivy/ivy_body_base.bin");
-
-  player.equipment.equippedFlags = 0;
-
-  player.animation.currentFrame = 0;
-  player.animation.frameTimer = 0.0f;
-  player.animation.frameDirection = 1;
-
-  player.movement.tilePosition = (Vector2){9.0f, 4.0f};
-  player.movement.targetTilePosition = player.movement.tilePosition;
-  player.movement.position =
-      (Vector2){player.movement.tilePosition.x * TILE_SIZE,
-                player.movement.tilePosition.y * TILE_SIZE};
-  player.movement.moveTimer = 0.0f;
-  player.movement.moveDuration = 0.15f;
-  player.movement.isMoving = false;
-  player.movement.isHoldingKey = false;
-  player.movement.movementSpeed = 1.0f;
-
-  player.movement.holdDelay = 0.15f;
-  player.movement.holdTimer = 0.0f;
-  player.movement.justTurned = false;
-
-  return player;
+    return InitPlayerAt(9, 4);
 }
 
-Player InitPlayerAt(int spawnX, int spawnY) {
-  Player player = {0};
+Player InitPlayerAt(const int spawnX, const int spawnY)
+{
+    Player player = {0};
 
-  player.graphics.action = ACTION_IDLE;
-  player.graphics.direction = DIRECTION_FRONT;
-  player.graphics.frameSize = (Vector2){64.0f, 64.0f};
-  player.graphics.headTexture =
-      LoadTextureFromBin("assets/characters/ivy/ivy_head_good.bin");
-  player.graphics.bodyTexture =
-      LoadTextureFromBin("assets/characters/ivy/ivy_body_base.bin");
+    player.graphics.action      = ACTION_IDLE;
+    player.graphics.direction   = DIRECTION_FRONT;
+    player.graphics.frameSize   = (Vector2){64.0f, 64.0f};
+    player.graphics.headTexture = LoadTextureFromBin("assets/characters/ivy/ivy_head_good.bin");
+    player.graphics.bodyTexture = LoadTextureFromBin("assets/characters/ivy/ivy_body_base.bin");
 
-  player.equipment.equippedFlags = 0;
+    player.equipment.equippedFlags = 0;
 
-  player.animation.currentFrame = 0;
-  player.animation.frameTimer = 0.0f;
-  player.animation.frameDirection = 1;
+    player.animation.currentFrame   = 0;
+    player.animation.frameTimer     = 0.0f;
+    player.animation.frameDirection = 1;
 
-  player.movement.tilePosition = (Vector2){(float)spawnX, (float)spawnY};
-  player.movement.targetTilePosition = player.movement.tilePosition;
-  player.movement.position =
-      (Vector2){(float)spawnX * TILE_SIZE,
-                (float)spawnY * TILE_SIZE};
-  player.movement.moveTimer = 0.0f;
-  player.movement.moveDuration = 0.15f;
-  player.movement.isMoving = false;
-  player.movement.isHoldingKey = false;
-  player.movement.movementSpeed = 1.0f;
+    player.movement.tilePosition        = (Vector2){(float) spawnX, (float) spawnY};
+    player.movement.targetTilePosition  = player.movement.tilePosition;
+    player.movement.position            = (Vector2){(float) spawnX * TILE_SIZE, (float) spawnY * TILE_SIZE};
+    player.movement.moveTimer           = 0.0f;
+    player.movement.moveDuration        = 0.15f;
+    player.movement.isMoving            = false;
+    player.movement.isHoldingKey        = false;
 
-  player.movement.holdDelay = 0.15f;
-  player.movement.holdTimer = 0.0f;
-  player.movement.justTurned = false;
+    player.movement.holdDelay           = 0.15f;
+    player.movement.holdTimer           = 0.0f;
+    player.movement.justTurned          = false;
 
-  return player;
+    return player;
 }
 
-int GetSpriteRow(const Player *player) {
-  int baseRow = 0;
+int GetSpriteRow(const Player *player)
+{
+    int baseRow = 0;
 
-  if (player->graphics.action == ACTION_WALK)
-    baseRow = 0;
-  else if (player->graphics.action == ACTION_RUN)
-    baseRow = 4;
+    if (player->graphics.action == ACTION_WALK)     baseRow = 0;
+    else if (player->graphics.action == ACTION_RUN) baseRow = 4;
 
-  switch (player->graphics.direction) {
-  case DIRECTION_FRONT:
-    return baseRow + 0;
-  case DIRECTION_LEFT:
-    return baseRow + 1;
-  case DIRECTION_RIGHT:
-    return baseRow + 2;
-  case DIRECTION_BACK:
-    return baseRow + 3;
-  default:
-    return baseRow;
-  }
-}
+    switch (player->graphics.direction)
+    {
+        case DIRECTION_FRONT:   return baseRow + 0;
+        case DIRECTION_LEFT:    return baseRow + 1;
+        case DIRECTION_RIGHT:   return baseRow + 2;
+        case DIRECTION_BACK:    return baseRow + 3;
 
-static void StartMoving(Player *player, const Vector2 inputDir,
-                        const Direction nextDir, const bool isShiftDown) {
-  player->graphics.direction = nextDir;
-  player->movement.moveDuration = isShiftDown ? 0.25f : 0.42f;
-  player->graphics.action = isShiftDown ? ACTION_RUN : ACTION_WALK;
-
-  player->movement.targetTilePosition.x =
-      player->movement.tilePosition.x + inputDir.x;
-  player->movement.targetTilePosition.y =
-      player->movement.tilePosition.y + inputDir.y;
-
-  player->movement.isMoving = true;
-  player->movement.moveTimer = 0.0f;
-}
-
-static void UpdateAnimation(Player *player, const float frameTime) {
-  if (player->graphics.action == ACTION_IDLE) {
-    player->animation.currentFrame = 1;
-    player->animation.frameTimer = 0.0f;
-  } else {
-    const float animSpeed = player->movement.moveDuration / 3.0f;
-
-    player->animation.frameTimer += frameTime;
-    if (player->animation.frameTimer >= animSpeed) {
-      player->animation.currentFrame += player->animation.frameDirection;
-
-      if (player->animation.currentFrame >= 2) {
-        player->animation.currentFrame = 2;
-        player->animation.frameDirection = -1;
-      } else if (player->animation.currentFrame <= 0) {
-        player->animation.currentFrame = 0;
-        player->animation.frameDirection = 1;
-      }
-
-      player->animation.frameTimer = 0.0f;
+        default:                return baseRow;
     }
-  }
 }
 
-static bool DirectionKeyPressed(const Direction dir) {
-  switch (dir) {
-  case DIRECTION_BACK:
-    return IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP);
-  case DIRECTION_FRONT:
-    return IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN);
-  case DIRECTION_LEFT:
-    return IsKeyPressed(KEY_A) || IsKeyPressed(KEY_LEFT);
-  case DIRECTION_RIGHT:
-    return IsKeyPressed(KEY_D) || IsKeyPressed(KEY_RIGHT);
-  default:
-    return false;
-  }
+static void
+StartMoving(Player *player, const Vector2 inputDir, const Direction nextDir, const bool isShiftDown)
+{
+    player->graphics.direction      = nextDir;
+    player->movement.moveDuration   = isShiftDown ? 0.25f : 0.42f;
+    player->graphics.action         = isShiftDown ? ACTION_RUN : ACTION_WALK;
+
+    player->movement.targetTilePosition.x = player->movement.tilePosition.x + inputDir.x;
+    player->movement.targetTilePosition.y = player->movement.tilePosition.y + inputDir.y;
+
+    player->movement.isMoving   = true;
+    player->movement.moveTimer  = 0.0f;
 }
 
-static bool GetMovementInput(Vector2 *dir, Direction *outDir) {
-  *dir = (Vector2){0};
+static void
+UpdateAnimation(Player *player, const float frameTime)
+{
+    if (player->graphics.action == ACTION_IDLE)
+    {
+        player->animation.currentFrame  = 1;
+        player->animation.frameTimer    = 0.0f;
+    }
 
-  if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) {
-    dir->y = -1;
-    *outDir = DIRECTION_BACK;
-    return true;
-  }
+    else {
+        const float animSpeed = player->movement.moveDuration / 3.0f;
+        player->animation.frameTimer += frameTime;
 
-  if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) {
-    dir->y = 1;
-    *outDir = DIRECTION_FRONT;
-    return true;
-  }
+        if (player->animation.frameTimer >= animSpeed) {
+            player->animation.currentFrame += player->animation.frameDirection;
 
-  if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) {
-    dir->x = -1;
-    *outDir = DIRECTION_LEFT;
-    return true;
-  }
+            if (player->animation.currentFrame >= 2) {
+                player->animation.currentFrame = 2;
+                player->animation.frameDirection = -1;
+            }
 
-  if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) {
-    dir->x = 1;
-    *outDir = DIRECTION_RIGHT;
-    return true;
-  }
+            else if (player->animation.currentFrame <= 0) {
+                player->animation.currentFrame = 0;
+                player->animation.frameDirection = 1;
+            }
 
-  return false;
+            player->animation.frameTimer = 0.0f;
+        }
+    }
 }
 
-static bool IsTileSolid(const Vector2 tilePos, const Collusion *collusion,
-                        const int count) {
-  const Vector2 worldPos = {tilePos.x * TILE_SIZE + TILE_SIZE / 2.0f,
-                            tilePos.y * TILE_SIZE + TILE_SIZE / 2.0f};
+static bool
+DirectionKeyPressed(const Direction dir)
+{
+    switch (dir)
+    {
+        case DIRECTION_BACK:    return IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP);
+        case DIRECTION_FRONT:   return IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN);
+        case DIRECTION_LEFT:    return IsKeyPressed(KEY_A) || IsKeyPressed(KEY_LEFT);
+        case DIRECTION_RIGHT:   return IsKeyPressed(KEY_D) || IsKeyPressed(KEY_RIGHT);
 
-  for (int c = 0; c < count; c++) {
-    for (int i = 0; i < collusion[c].rectCount; i++) {
-      if (CheckCollisionPointRec(worldPos, collusion[c].rect[i])) {
+        default:                return false;
+    }
+}
+
+static bool
+GetMovementInput(Vector2 *dir, Direction *outDir)
+{
+    *dir = (Vector2){0};
+
+    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) {
+        dir->y  = -1;
+        *outDir = DIRECTION_BACK;
         return true;
-      }
     }
-  }
-  return false;
+
+    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) {
+        dir->y  = 1;
+        *outDir = DIRECTION_FRONT;
+        return true;
+    }
+
+    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) {
+        dir->x  = -1;
+        *outDir = DIRECTION_LEFT;
+        return true;
+    }
+
+    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) {
+        dir->x  = 1;
+        *outDir = DIRECTION_RIGHT;
+        return true;
+    }
+
+    return false;
+}
+
+static bool
+IsTileSolid(const Vector2 tilePos, const Collision *collision)
+{
+    const Vector2 worldPos = {
+        tilePos.x * TILE_SIZE + TILE_SIZE / 2.0f,
+        tilePos.y * TILE_SIZE + TILE_SIZE / 2.0f
+    };
+
+    for (int i = 0; i < collision->rectCount; i++) {
+        if (CheckCollisionPointRec(worldPos, collision->rect[i])) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void UpdatePlayer(Player *player, const float frameTime,
-                  const Collusion *collusion, const int count) {
-  Vector2 inputDir = {0};
-  Direction nextDir = player->graphics.direction;
-  const bool hasInput = GetMovementInput(&inputDir, &nextDir);
-  const bool isShift = IsKeyDown(KEY_LEFT_SHIFT);
+                  const Collision *collision, const Tilemap *tilemap)
+{
+    Vector2 inputDir    = {0};
+    Direction nextDir   = player->graphics.direction;
+    const bool hasInput = GetMovementInput(&inputDir, &nextDir);
+    const bool isShift  = IsKeyDown(KEY_LEFT_SHIFT);
 
-  player->movement.isHoldingKey = hasInput;
+    player->movement.isHoldingKey = hasInput;
 
-  if (!player->movement.isMoving) {
-    if (!hasInput) {
-      player->movement.holdTimer = 0.0f;
-      player->movement.justTurned = false;
-      player->graphics.action = ACTION_IDLE;
-    } else {
-      const bool dirChanged = player->graphics.direction != nextDir;
+    if (IsKeyPressed(KEY_Z)) {
+        player->movement.justTriggeredEvent = TryTriggerTileEvent(player, tilemap);
+    }
 
-      if (dirChanged && DirectionKeyPressed(nextDir)) {
-        player->graphics.direction = nextDir;
-        player->graphics.action = ACTION_IDLE;
-        player->movement.holdTimer = 0.0f;
-        player->movement.justTurned = true;
-      } else {
-        player->movement.holdTimer += frameTime;
-
-        if (!player->movement.justTurned ||
-            player->movement.holdTimer >= player->movement.holdDelay) {
-
-          const Vector2 targetPos = {
-              player->movement.tilePosition.x + inputDir.x,
-              player->movement.tilePosition.y + inputDir.y};
-
-          if (!IsTileSolid(targetPos, collusion, count)) {
+    if (!player->movement.isMoving)
+    {
+        if (!hasInput) {
             player->movement.holdTimer = 0.0f;
             player->movement.justTurned = false;
-            StartMoving(player, inputDir, nextDir, isShift);
-          } else {
-            player->graphics.direction = nextDir;
             player->graphics.action = ACTION_IDLE;
-          }
         }
-      }
-    }
-  }
+        else {
+            const bool dirChanged = player->graphics.direction != nextDir;
 
-  if (player->movement.isMoving) {
-    player->movement.moveTimer += frameTime;
-    float time = player->movement.moveTimer / player->movement.moveDuration;
+            if (dirChanged && DirectionKeyPressed(nextDir))
+            {
+                player->graphics.direction = nextDir;
+                player->graphics.action = ACTION_IDLE;
+                player->movement.holdTimer = 0.0f;
+                player->movement.justTurned = true;
+            }
+            else {
+                player->movement.holdTimer += frameTime;
 
-    if (time >= 1.0f) {
-      player->movement.tilePosition = player->movement.targetTilePosition;
+                if (!player->movement.justTurned ||
+                    player->movement.holdTimer >= player->movement.holdDelay) {
+                    const Vector2 targetPos = {
+                        player->movement.tilePosition.x + inputDir.x,
+                        player->movement.tilePosition.y + inputDir.y
+                    };
 
-      Vector2 freshInputDir = {0};
-      Direction freshNextDir;
-      const bool stillHolding = GetMovementInput(&freshInputDir, &freshNextDir);
-
-      if (stillHolding) {
-        const Vector2 nextTarget = {
-            player->movement.tilePosition.x + freshInputDir.x,
-            player->movement.tilePosition.y + freshInputDir.y};
-
-        if (!IsTileSolid(nextTarget, collusion, count)) {
-          player->movement.targetTilePosition = nextTarget;
-          player->movement.moveTimer -= player->movement.moveDuration;
-          player->movement.moveDuration = isShift ? 0.25f : 0.42f;
-          player->graphics.action = isShift ? ACTION_RUN : ACTION_WALK;
-          player->graphics.direction =
-              freshNextDir; // Pake freshNextDir biar update
-
-          time = player->movement.moveTimer / player->movement.moveDuration;
-        } else {
-          player->movement.isMoving = false;
-          player->movement.moveTimer = 0.0f;
-          player->graphics.action = ACTION_IDLE;
-          time = 1.0f;
+                    if (!IsTileSolid(targetPos, collision)) {
+                        player->movement.holdTimer = 0.0f;
+                        player->movement.justTurned = false;
+                        StartMoving(player, inputDir, nextDir, isShift);
+                    }
+                    else {
+                        player->graphics.direction = nextDir;
+                        player->graphics.action = ACTION_IDLE;
+                    }
+                }
+            }
         }
-      } else {
-        player->movement.isMoving = false;
-        player->movement.moveTimer = 0.0f;
-        player->graphics.action = ACTION_IDLE;
-        time = 1.0f;
-      }
     }
 
-    if (time > 1.0f)
-      time = 1.0f;
+    if (player->movement.isMoving)
+    {
+        player->movement.moveTimer += frameTime;
+        float time = player->movement.moveTimer / player->movement.moveDuration;
 
-    const Vector2 startPosition = {player->movement.tilePosition.x * TILE_SIZE,
-                                   player->movement.tilePosition.y * TILE_SIZE};
+        if (time >= 1.0f)
+        {
+            player->movement.tilePosition = player->movement.targetTilePosition;
 
-    const Vector2 endPosition = {
-        player->movement.targetTilePosition.x * TILE_SIZE,
-        player->movement.targetTilePosition.y * TILE_SIZE};
+            Vector2 freshInputDir = {0};
+            Direction freshNextDir;
+            const bool stillHolding = GetMovementInput(&freshInputDir, &freshNextDir);
 
-    player->movement.position.x =
-        startPosition.x + (endPosition.x - startPosition.x) * time;
-    player->movement.position.y =
-        startPosition.y + (endPosition.y - startPosition.y) * time;
-  }
+            if (stillHolding)
+            {
+                const Vector2 nextTarget = {
+                    player->movement.tilePosition.x + freshInputDir.x,
+                    player->movement.tilePosition.y + freshInputDir.y
+                };
 
-  UpdateAnimation(player, frameTime);
-}
+                if (!IsTileSolid(nextTarget, collision))
+                {
+                    player->movement.targetTilePosition = nextTarget;
+                    player->movement.moveTimer -= player->movement.moveDuration;
+                    player->movement.moveDuration = isShift ? 0.25f : 0.42f;
+                    player->graphics.action = isShift ? ACTION_RUN : ACTION_WALK;
+                    player->graphics.direction = freshNextDir;
 
-void DrawPlayer(const Player *player) {
-  const int spriteRow = GetSpriteRow(player);
+                    time = player->movement.moveTimer / player->movement.moveDuration;
+                }
+                else {
+                    player->movement.isMoving = false;
+                    player->movement.moveTimer = 0.0f;
+                    player->graphics.action = ACTION_IDLE;
+                    time = 1.0f;
+                }
+            }
 
-  const Rectangle sourceRect = {
-      .x = (float)player->animation.currentFrame * player->graphics.frameSize.x,
-      .y = (float)spriteRow * player->graphics.frameSize.y,
-      .width = player->graphics.frameSize.x,
-      .height = player->graphics.frameSize.y};
+            else {
+                player->movement.isMoving = false;
+                player->movement.moveTimer = 0.0f;
+                player->graphics.action = ACTION_IDLE;
+                time = 1.0f;
+            }
+        }
 
-  const Rectangle destRec = {
-      .x = player->movement.position.x - player->graphics.frameSize.x / 4.0f,
-      .y = player->movement.position.y - player->graphics.frameSize.y / 2.0f,
-      .width = player->graphics.frameSize.x,
-      .height = player->graphics.frameSize.y};
+        if (time > 1.0f) time = 1.0f;
 
-  const Vector2 position = {0};
+        const Vector2 startPosition = {
+            player->movement.tilePosition.x * TILE_SIZE,
+            player->movement.tilePosition.y * TILE_SIZE
+        };
 
-  DrawTexturePro(player->graphics.bodyTexture, sourceRect, destRec, position,
-                 0.0f, WHITE);
-  DrawTexturePro(player->graphics.headTexture, sourceRect, destRec, position,
-                 0.0f, WHITE);
+        const Vector2 endPosition = {
+            player->movement.targetTilePosition.x * TILE_SIZE,
+            player->movement.targetTilePosition.y * TILE_SIZE
+        };
 
-  for (int i = 0; i < MAX_SLOTS; i++) {
-    if (PlayerIsEquipItem(player, i)) {
-      DrawTexturePro(player->equipment.equippedTextures[i], sourceRect, destRec,
-                     position, 0.0f, WHITE);
+        player->movement.position.x = startPosition.x + (endPosition.x - startPosition.x) * time;
+        player->movement.position.y = startPosition.y + (endPosition.y - startPosition.y) * time;
     }
-  }
+
+    UpdateAnimation(player, frameTime);
 }
 
-void PlayerEquipItem(Player *p, const Item newItem) {
-  if (newItem.slot < MAX_SLOTS) {
-    p->equipment.equippedTextures[newItem.slot] = newItem.texture;
-    p->equipment.equippedFlags |= 1 << newItem.slot;
-  }
+void DrawPlayer(const Player *player)
+{
+    const int spriteRow = GetSpriteRow(player);
+
+    const Rectangle sourceRect = {
+        .x      = (float) player->animation.currentFrame * player->graphics.frameSize.x,
+        .y      = (float) spriteRow * player->graphics.frameSize.y,
+        .width  = player->graphics.frameSize.x,
+        .height = player->graphics.frameSize.y
+    };
+
+    const Rectangle destRec = {
+        .x      = player->movement.position.x - player->graphics.frameSize.x / 4.0f,
+        .y      = player->movement.position.y - player->graphics.frameSize.y / 2.0f,
+        .width  = player->graphics.frameSize.x,
+        .height = player->graphics.frameSize.y
+    };
+
+    const Vector2 position = {0};
+
+    DrawTexturePro(player->graphics.bodyTexture, sourceRect, destRec, position, 0.0f, WHITE);
+    DrawTexturePro(player->graphics.headTexture, sourceRect, destRec, position, 0.0f, WHITE);
+
+    for (int i = 0; i < MAX_SLOTS; i++) {
+        if (PlayerIsEquipped(player, (EquipSlot)i)) {
+            DrawTexturePro(
+                player->equipment.equipped[i].texture, sourceRect, destRec, position, 0.0f, WHITE);
+        }
+    }
 }
 
+void PlayerEquipItem(Player *p, const Item *item)
+{
+    if (!p || !item) return;
+    if (item->slot >= MAX_SLOTS) return;
+    if (PlayerIsEquipped(p, item->slot)) PlayerUnequipItem(p, item->slot);
 
+    p->equipment.equipped[item->slot] = *item;
+    p->equipment.equippedFlags |= (uint16_t)(1u << item->slot);
+}
 
-bool PlayerIsEquipItem(const Player *p, const EquipSlot slot) {
-  return slot < MAX_SLOTS && p->equipment.equippedFlags & 1 << slot;
+void PlayerUnequipItem(Player *p, const EquipSlot slot)
+{
+    if (!p || slot >= MAX_SLOTS) return;
+    if (!PlayerIsEquipped(p, slot)) return;
+
+    ItemUnload(&p->equipment.equipped[slot]);
+    p->equipment.equipped[slot] = (Item){0};
+    p->equipment.equippedFlags &= (uint16_t)~(1u << slot);
+}
+
+bool PlayerIsEquipped(const Player *p, const EquipSlot slot)
+{
+    if (!p || slot >= MAX_SLOTS) return false;
+    return (p->equipment.equippedFlags & (uint16_t)(1u << slot)) != 0;
+}
+
+const Item *PlayerGetEquippedItem(const Player *p, const EquipSlot slot)
+{
+    if (!PlayerIsEquipped(p, slot)) return NULL;
+    return &p->equipment.equipped[slot];
+}
+
+bool TryTriggerTileEvent(const Player *player, const Tilemap *tilemap) {
+    if (!tilemap || tilemap->eventGotoMapId == 0) return false;
+
+    const int px = (int) player->movement.tilePosition.x;
+    const int py = (int) player->movement.tilePosition.y;
+
+    if (px == tilemap->eventGotoMapTileX && py == tilemap->eventGotoMapTileY) {
+        return true;
+    }
+    return false;
 }
