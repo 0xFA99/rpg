@@ -1,39 +1,39 @@
-#include "player.h"
+#include <stdlib.h>
+#include <assert.h>
 
+#include "player.h"
 #include "game.h"
 #include "collision.h"
 
-Player InitPlayer(void) {
-    return InitPlayerAt(9, 4);
-}
 
-Player InitPlayerAt(const int spawnX, const int spawnY)
+Player *InitPlayer(void)
 {
-    Player player = {0};
+    Player *player = malloc(sizeof(Player));
+    assert(player != NULL);
 
-    player.graphics.action      = ACTION_IDLE;
-    player.graphics.direction   = DIRECTION_FRONT;
-    player.graphics.frameSize   = (Vector2){64.0f, 64.0f};
-    player.graphics.headTexture = LoadTextureFromBin("assets/characters/ivy/ivy_head_good.bin");
-    player.graphics.bodyTexture = LoadTextureFromBin("assets/characters/ivy/ivy_body_base.bin");
+    player->graphics.action      = ACTION_IDLE;
+    player->graphics.direction   = DIRECTION_FRONT;
+    player->graphics.frameSize   = (Vector2){ 64.0f, 64.0f };
+    player->graphics.headTexture = LoadTextureFromBin("assets/characters/ivy/ivy_head_good.bin");
+    player->graphics.bodyTexture = LoadTextureFromBin("assets/characters/ivy/ivy_body_base.bin");
 
-    player.equipment.equippedFlags = 0;
+    player->animation.currentFrame   = 0;
+    player->animation.frameTimer     = 0.0f;
+    player->animation.frameDirection = 1;
 
-    player.animation.currentFrame   = 0;
-    player.animation.frameTimer     = 0.0f;
-    player.animation.frameDirection = 1;
+    player->movement.moveDuration = 0.42f;
+    player->movement.holdDelay    = 0.15f;
 
-    player.movement.tilePosition        = (Vector2){(float) spawnX, (float) spawnY};
-    player.movement.targetTilePosition  = player.movement.tilePosition;
-    player.movement.position            = (Vector2){(float) spawnX * TILE_SIZE, (float) spawnY * TILE_SIZE};
-    player.movement.moveTimer           = 0.0f;
-    player.movement.moveDuration        = 0.15f;
-    player.movement.isMoving            = false;
-    player.movement.isHoldingKey        = false;
+    player->equipment.equippedFlags = 0;
 
-    player.movement.holdDelay           = 0.15f;
-    player.movement.holdTimer           = 0.0f;
-    player.movement.justTurned          = false;
+    player->portrait.hair = LoadTextureFromBin("assets/characters/ivy/default_hair.bin");
+    player->portrait.head = LoadTextureFromBin("assets/characters/ivy/default_head.bin");
+    player->portrait.eyes = LoadTextureFromBin("assets/characters/ivy/default_eyes.bin");
+    player->portrait.mouth = LoadTextureFromBin("assets/characters/ivy/default_mouth.bin");
+
+    player->portrait.body = LoadTextureFromBin("assets/characters/ivy/default_body.bin");
+    player->portrait.panty = LoadTextureFromBin("assets/characters/ivy/default_panty.bin");
+
 
     return player;
 }
@@ -315,6 +315,27 @@ void DrawPlayer(const Player *player)
     }
 }
 
+void UnloadPlayer(Player *player)
+{
+    assert(player != NULL);
+
+    // Player Graphics
+    PlayerGraphics *pg = &player->graphics;
+    if (IsTextureValid(pg->headTexture)) UnloadTexture(pg->headTexture);
+    if (IsTextureValid(pg->bodyTexture)) UnloadTexture(pg->bodyTexture);
+
+    // Player portrait
+    // TODO: Make dynamic count for player portrait!
+    // for (int i = 0; i < 9; i++) {
+    //     if (IsTextureValid(player->portrait[i * sizeof(Texture2D)])) UnloadTexture()
+    // }
+
+    // Player Item
+    // TODO: Unload Player Items
+
+    if (player) free(player);
+}
+
 void PlayerEquipItem(Player *p, const Item *item)
 {
     if (!p || !item) return;
@@ -323,6 +344,15 @@ void PlayerEquipItem(Player *p, const Item *item)
 
     p->equipment.equipped[item->slot] = *item;
     p->equipment.equippedFlags |= (uint16_t)(1u << item->slot);
+
+    // TODO: Create portrait based on player equip item
+    // if (item->slot == SLOT_HAIR) {
+    //     p->portrait.portraitHair = item->texture;
+    // } else if (item->slot == SLOT_TOP) {
+    //     p->portrait.portraitTop = item->texture;
+    // } else if (item->slot == SLOT_BOTTOM) {
+    //     p->portrait.portraitBottom = item->texture;
+    // }
 }
 
 void PlayerUnequipItem(Player *p, const EquipSlot slot)
