@@ -2,5 +2,7 @@
 .cache/
 build/
 cmake-build-debug/
+cmake-build-default/
+cmake-build-release/
 tools/
 development/

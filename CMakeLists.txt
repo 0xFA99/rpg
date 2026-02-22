@@ -20,6 +20,9 @@ set(SOURCES
         src/camera.c
         src/collision.c
         src/item.c
+        src/screens/title.c
+        src/screens/gameplay.c
+        src/screens/options.c
 )
 
 add_executable(rpg ${SOURCES})
