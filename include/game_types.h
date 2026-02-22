@@ -9,12 +9,12 @@ typedef enum {
 } Direction;
 
 typedef enum {
-    SLOT_BOTTOM,
-    SLOT_TOP,
-    SLOT_MASK,
-    SLOT_HAIR,
-    SLOT_FEET,
-    SLOT_HAND_MAIN,
+    SLOT_BOTTOM     = 1 << 0,
+    SLOT_TOP        = 1 << 1,
+    SLOT_MASK       = 1 << 2,
+    SLOT_HAIR       = 1 << 3,
+    SLOT_FEET       = 1 << 4,
+    SLOT_HAND_MAIN  = 1 << 5,
     MAX_SLOTS
 } EquipSlot;
 
