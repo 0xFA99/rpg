@@ -12,5 +12,6 @@ typedef struct {
 
 Item    ItemLoad(const char *binPath, EquipSlot slot, const char *label);
 void    ItemUnload(Item *item);
+bool    IsItemValid(Item *item);
 
 #endif

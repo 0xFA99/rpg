@@ -27,3 +27,10 @@ void ItemUnload(Item *item)
         item->texture = (Texture2D){0};
     }
 }
+
+bool IsItemValid(Item *item)
+{
+    if (!item) return false;
+
+    return IsTextureValid(item->texture);
+}
