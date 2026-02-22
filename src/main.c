@@ -1,90 +1,78 @@
-#include "camera.h"
+#include <stdio.h>
+
 #include "raylib.h"
-#include "tilemap.h"
+#include "game.h"
 
 int main(void)
 {
-  const int screenWidth = 800;
-  const int screenHeight = 600;
+    const int screenWidth = 800;
+    const int screenHeight = 600;
 
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
-  InitWindow(screenWidth, screenHeight, "RPG Game");
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
+    InitWindow(screenWidth, screenHeight, "RPG Game");
 
-  Item hair     = LoadItem("assets/characters/ivy/ivy_hair_basic.bin",      SLOT_HAIR, "hair");
-  Item shirt    = LoadItem("assets/characters/ivy/ivy_shirt_basic.bin",     SLOT_TOP, "shirt");
-  Item bottom   = LoadItem("assets/characters/ivy/ivy_bottom_basic.bin",    SLOT_BOTTOM, "bottom");
+    // Item hair = LoadItem("assets/characters/ivy/ivy_hair_basic.bin", SLOT_HAIR, "hair");
+    // Item shirt = LoadItem("assets/characters/ivy/ivy_shirt_basic.bin", SLOT_TOP, "shirt");
+    // Item bottom = LoadItem("assets/characters/ivy/ivy_bottom_basic.bin", SLOT_BOTTOM, "bottom");
 
-  // Item sword      = LoadItem("../assets/weapons/short_sword.bin",
-  // SLOT_HAND_MAIN, "sword"); Item lantern    =
-  // LoadItem("../assets/weapons/lantern.bin", SLOT_HAND_OFF, "lantern");
+    // GameState game = {0};
+    // GameInit(&game);
 
-  // Load map first to get spawn point
-  Tilemap tilemap = LoadTilemapById(1);
+    // Player player = InitPlayerAt(1, 1);
+    // PlayerEquipItem(&player, hair);
+    // PlayerEquipItem(&player, shirt);
+    // PlayerEquipItem(&player, bottom);
 
-  Player player = InitPlayerAt(tilemap.spawnPointX, tilemap.spawnPointY);
-  PlayerEquipItem(&player, hair);
-  PlayerEquipItem(&player, shirt);
-  PlayerEquipItem(&player, bottom);
+    // Vector2 spawnPos = {0};
+    // GameLoadMap(1, &game, &spawnPos);
+    // player.movement.tilePosition = spawnPos;
+    // player.movement.position = (Vector2){ spawnPos.x * TILE_SIZE, spawnPos.y * TILE_SIZE };
+    // player.movement.targetTilePosition = spawnPos;
+    // player.movement.isMoving = false;
 
-  // PlayerEquipItem(&player, sword);
-  // PlayerEquipItem(&player, lantern);
+    // GameCamera camera = InitGameCamera(screenWidth, screenHeight);
 
-  GameCamera camera = InitGameCamera(screenWidth, screenHeight);
+    // ScreenManager sm = { SCREEN_TITLE, .data.title = NULL };
+    // ChangeToScreen(&sm, SCREEN_TITLE);
 
-  Collusion coll1 = InitCollusion(&tilemap, 0);
-  Collusion coll2 = InitCollusion(&tilemap, 1);
+    GameState sm = {
+        .gameRunning    = true,
+        .currentScreen  = (Screen) {
+            .type           = SCREEN_TITLE,
+            .data           = NULL,
+            .Init           = ScreenTitleInit,
+            .Update         = ScreenTitleUpdate,
+            .Draw           = ScreenTitleDraw,
+            .Unload         = ScreenTitleUnload,
+            .screenUpdated  = false
+        },
+        .frameTime = 0.0f
+    };
 
-  Collusion colls[] = {coll1, coll2};
+    sm.currentScreen.Init(&sm.currentScreen);
 
-  const RenderTexture2D canvas = LoadRenderTexture(
-      tilemap.width * tilemap.tileWidth, tilemap.height * tilemap.tileHeight);
+    SetTargetFPS(60);
 
-  BeginTextureMode(canvas);
-  ClearBackground(BLANK);
-  DrawTilemap(&tilemap);
-  EndTextureMode();
+    while (!WindowShouldClose() && sm.gameRunning) {
+        sm.frameTime = GetFrameTime();
 
-  SetTargetFPS(60);
+        if (sm.currentScreen.screenUpdated) {
+            UpdateScreen(&sm.currentScreen);
+        }
 
-  float frameTime;
+        sm.currentScreen.Update(&sm, &sm.gameRunning);
 
-  while (!WindowShouldClose()) {
+        BeginDrawing();
+            ClearBackground(BLACK);
+            sm.currentScreen.Draw(&sm.currentScreen);
+        EndDrawing();
+    }
 
-    frameTime = GetFrameTime();
+    // ChangeToScreen(&sm, -1);
+    // GameUnload(&game);
 
-    UpdatePlayer(&player, frameTime, colls, 2);
-    UpdateCamera2D(&camera, &player, &tilemap, frameTime);
+    sm.currentScreen.Unload(&sm.currentScreen);
 
-    BeginDrawing();
-    ClearBackground(BLACK);
-
-    BeginMode2D(camera.camera);
-
-    DrawTexturePro(canvas.texture,
-                   (Rectangle){0, 0, (float)canvas.texture.width,
-                               -(float)canvas.texture.height},
-                   (Rectangle){0, 0, (float)canvas.texture.width,
-                               (float)canvas.texture.height},
-                   (Vector2){0, 0}, 0.0f, WHITE);
-
-    // [DEBUG] Collusion
-    // for (int c = 0; c < 2; c++) {
-    //     for (int i = 0; i < colls[c].rectCount; i++) {
-    //         DrawRectangleLinesEx(colls[c].rect[i], 1, BLUE);
-    //     }
-    // }
-
-    DrawPlayer(&player);
-
-    EndMode2D();
-    EndDrawing();
-  }
-
-  DestroyCollusion(&coll1);
-  DestroyCollusion(&coll2);
-  UnloadTilemap(&tilemap);
-  UnloadRenderTexture(canvas);
-
-  CloseWindow();
-  return 0;
+    CloseWindow();
+    return 0;
 }

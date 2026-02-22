@@ -18,7 +18,8 @@ set(SOURCES
         src/game.c
         src/tilemap.c
         src/camera.c
-        src/collusion.c
+        src/collision.c
+        src/item.c
 )
 
 add_executable(rpg ${SOURCES})

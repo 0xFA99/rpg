@@ -2,18 +2,21 @@
 #include <stdio.h>
 
 #include "tilemap.h"
+
+#include <assert.h>
+
 #include "game.h"
 
 
 #define TILESET_PATH "assets/tilesets/"
 #define TILE_HALF 16
-#define TILE_SIZE 32
 
 
 static void
 read_exact(FILE *f, void *dst, const size_t n, const char *label)
 {
-    if (fread(dst, 1, n, f) != n) {
+    if (fread(dst, 1, n, f) != n)
+    {
         TraceLog(LOG_ERROR, "[Tilemap] Failed to read file: %s", label);
         exit(1);
     }
@@ -55,9 +58,13 @@ HasTile(const TileLayer *layer, const int x, const int y, const int width, const
 }
 
 
-Tilemap LoadTilemapBinary(const char *jsonPath)
+Tilemap *LoadTilemapBinary(const char *jsonPath)
 {
-    Tilemap tilemap = {0};
+    Tilemap *tilemap = malloc(sizeof(Tilemap));
+    if (!tilemap) {
+        TraceLog(LOG_ERROR, "[Tilemap] Failed to allocate memory");
+        exit(1);
+    }
 
     FILE *f = fopen(jsonPath, "rb");
     if (!f) {
@@ -65,58 +72,75 @@ Tilemap LoadTilemapBinary(const char *jsonPath)
         exit(1);
     }
 
-    // ── HEADER ───────────────────────────────────────────────────────────────
-    read_exact(f, &tilemap.width,       sizeof(int), "width");
-    read_exact(f, &tilemap.height,      sizeof(int), "height");
-    read_exact(f, &tilemap.tileWidth,   sizeof(int), "tileWidth");
-    read_exact(f, &tilemap.tileHeight,  sizeof(int), "tileHeight");
-    read_exact(f, &tilemap.tilesetCount,sizeof(int), "tilesetCount");
-    read_exact(f, &tilemap.layerCount,  sizeof(int), "layerCount");
-    read_exact(f, &tilemap.mapId,      sizeof(int), "mapId");
+    read_exact(f, &tilemap->width,          sizeof(int), "width");
+    read_exact(f, &tilemap->height,         sizeof(int), "height");
+    read_exact(f, &tilemap->tileWidth,      sizeof(int), "tileWidth");
+    read_exact(f, &tilemap->tileHeight,     sizeof(int), "tileHeight");
+    read_exact(f, &tilemap->tilesetCount,   sizeof(int), "tilesetCount");
+    read_exact(f, &tilemap->layerCount,     sizeof(int), "layerCount");
+    read_exact(f, &tilemap->mapId,          sizeof(int), "mapId");
 
-    // ── MAP PROPERTIES ───────────────────────────────────────────────────────
-    read_exact(f, &tilemap.spawnPointX, sizeof(int), "spawnPointX");
-    read_exact(f, &tilemap.spawnPointY, sizeof(int), "spawnPointY");
+    TraceLog(LOG_INFO, "[Tilemap] Loaded: %dx%d, tile:%dx%d, layers:%d, tilesets:%d",
+             tilemap->width, tilemap->height, tilemap->tileWidth, tilemap->tileHeight,
+             tilemap->layerCount, tilemap->tilesetCount);
 
-    tilemap.tilesets = (Tileset *)calloc(tilemap.tilesetCount, sizeof(Tileset));
-    if (!tilemap.tilesets) { TraceLog(LOG_ERROR, "[Tilemap] Out of memory for tilesets"); exit(1); }
+    read_exact(f, &tilemap->spawnPointX,        sizeof(int), "spawnPointX");
+    read_exact(f, &tilemap->spawnPointY,        sizeof(int), "spawnPointY");
+    read_exact(f, &tilemap->eventGotoMapId,     sizeof(int), "eventGotoMapId");
+    read_exact(f, &tilemap->eventGotoMapTileX,  sizeof(int), "eventGotoMapTileX");
+    read_exact(f, &tilemap->eventGotoMapTileY,  sizeof(int), "eventGotoMapTileY");
 
-    char pathBuffer[SHORT_STRING] = {0};
+    tilemap->tilesets = (Tileset *)calloc(tilemap->tilesetCount, sizeof(Tileset));
+    if (!tilemap->tilesets) { TraceLog(LOG_ERROR, "[Tilemap] Out of memory for tilesets"); exit(1); }
 
-    for (int i = 0; i < tilemap.tilesetCount; i++)
+    char pathBuffer[256] = {0};
+
+    for (int i = 0; i < tilemap->tilesetCount; i++)
     {
-        Tileset *ts = &tilemap.tilesets[i];
+        Tileset *ts = &tilemap->tilesets[i];
 
         read_exact(f, &ts->firstGid,      sizeof(int), "firstGid");
         read_exact(f, &ts->propertyCount, sizeof(int), "propertyCount");
         ts->texturePath = read_string(f);
 
-        ts->properties = (TileProperties *)malloc(ts->propertyCount * sizeof(TileProperties));
-        if (!ts->properties) { TraceLog(LOG_ERROR, "[Tilemap] Out of memory for tile properties"); exit(1); }
+        ts->properties = (TileProp *)malloc(ts->propertyCount * sizeof(TileProp));
+        if (!ts->properties)
+        {
+            TraceLog(LOG_ERROR, "[Tilemap] Out of memory for tile properties");
+            exit(1);
+        }
 
-        for (int j = 0; j < ts->propertyCount; j++) {
+        for (int j = 0; j < ts->propertyCount; j++)
+        {
             read_exact(f, &ts->properties[j].id,   sizeof(int), "prop.id");
             read_exact(f, &ts->properties[j].type, sizeof(int), "prop.type");
         }
 
-        snprintf(pathBuffer, SHORT_STRING, "%s%s", TILESET_PATH, ts->texturePath);
+        snprintf(pathBuffer, sizeof(pathBuffer), "%s%s", TILESET_PATH, ts->texturePath);
         ts->texture = LoadTextureFromBin(pathBuffer);
     }
 
-    // ── LAYERS ───────────────────────────────────────────────────────────────
-    tilemap.layers = (TileLayer *)calloc(tilemap.layerCount, sizeof(TileLayer));
-    if (!tilemap.layers) { TraceLog(LOG_ERROR, "[Tilemap] Out of memory for layers"); exit(1); }
-
-    for (int i = 0; i < tilemap.layerCount; i++)
+    tilemap->layers = (TileLayer *)calloc(tilemap->layerCount, sizeof(TileLayer));
+    if (!tilemap->layers)
     {
-        TileLayer *layer = &tilemap.layers[i];
+        TraceLog(LOG_ERROR, "[Tilemap] Out of memory for layers");
+        exit(1);
+    }
+
+    for (int i = 0; i < tilemap->layerCount; i++)
+    {
+        TileLayer *layer = &tilemap->layers[i];
 
         read_exact(f, &layer->width,  sizeof(int), "layer.width");
         read_exact(f, &layer->height, sizeof(int), "layer.height");
 
-        const int cell_count = layer->width * layer->height;
-        layer->data = (unsigned int *)malloc(cell_count * sizeof(unsigned int));
-        if (!layer->data) { TraceLog(LOG_ERROR, "[Tilemap] Out of memory for layer data"); exit(1); }
+        const int cell_count    = layer->width * layer->height;
+        layer->data             = malloc(cell_count * sizeof(int));
+        if (!layer->data)
+        {
+            TraceLog(LOG_ERROR, "[Tilemap] Out of memory for layer data");
+            exit(1);
+        }
 
         read_exact(f, layer->data, cell_count * sizeof(unsigned int), "layer.data");
     }
@@ -125,10 +149,11 @@ Tilemap LoadTilemapBinary(const char *jsonPath)
     return tilemap;
 }
 
-Tilemap LoadTilemapById(int mapId)
+Tilemap *LoadTilemapById(const int mapId)
 {
-    char path[SHORT_STRING];
-    snprintf(path, SHORT_STRING, "assets/tilemaps/map_%d.bin", mapId);
+    char path[256];
+    snprintf(path, sizeof(path), "assets/tilemaps/map_%d.bin", mapId);
+
     return LoadTilemapBinary(path);
 }
 
@@ -136,21 +161,21 @@ void UnloadTilemap(Tilemap *tilemap)
 {
     if (!tilemap) return;
 
-    // Unload tilesets
-    for (int i = 0; i < tilemap->tilesetCount; i++) {
+    for (int i = 0; i < tilemap->tilesetCount; i++)
+    {
         UnloadTexture(tilemap->tilesets[i].texture);
         free(tilemap->tilesets[i].texturePath);
         free(tilemap->tilesets[i].properties);
     }
+
     free(tilemap->tilesets);
 
-    // Unload layers
     for (int i = 0; i < tilemap->layerCount; i++) {
         free(tilemap->layers[i].data);
     }
+
     free(tilemap->layers);
 
-    // Reset tilemap
     *tilemap = (Tilemap){0};
 }
 
@@ -290,7 +315,8 @@ DrawTableTile(const Tilemap *tilemap, const Tileset *tileset,
              const Rectangle src, const Vector2 pos,
              const int x, const int y)
 {
-    const TileType typeN = GetTileType(tilemap, 1, x, y - 1);
+    // TODO: Finish Autotile Table (Vertical)
+    // const TileType typeN = GetTileType(tilemap, 1, x, y - 1);
     const TileType typeS = GetTileType(tilemap, 1, x, y + 1);
     const TileType typeE = GetTileType(tilemap, 1, x + 1, y);
     const TileType typeW = GetTileType(tilemap, 1, x - 1, y);
@@ -371,105 +397,131 @@ DrawBorderTile(const Tilemap *tilemap, const Tileset *tileset,
     if (!S && !E && SE) DrawTextureRec(texture, (Rectangle){ src.x + TILE_SIZE + TILE_HALF, src.y + TILE_HALF, TILE_HALF, TILE_HALF }, (Vector2){ pos.x + TILE_HALF, pos.y + TILE_HALF }, WHITE);
 }
 
-void DrawTilemap(const Tilemap *tilemap)
+static TileDrawInfo
+GetTileDrawInfo(const Tilemap *tilemap, const TileLayer *layer, const int x, const int y)
 {
-    for (int l = 0; l < tilemap->layerCount; l++) {
-        const TileLayer *layer = &tilemap->layers[l];
+    TileDrawInfo info = {0};
 
-        for (int y = 0; y < layer->height; y++) {
-            for (int x = 0; x < layer->width; x++) {
-                const unsigned int gid = layer->data[y * layer->width + x];
-                if (gid == 0) continue;
+    if (!tilemap || !tilemap->tilesets || !layer || !layer->data) return info;
 
-                const int tsIndex = FindTilesetIndex(tilemap, gid);
-                if (tsIndex == -1) continue;
+    const unsigned int gid = layer->data[y * layer->width + x];
+    if (gid == 0) return info;
 
-                const Tileset *ts = &tilemap->tilesets[tsIndex];
-                const int localId = (int)gid - ts->firstGid;
-                const int tilesPerRow = ts->texture.width / tilemap->tileWidth;
+    const int tsIndex = FindTilesetIndex(tilemap, gid);
+    if (tsIndex == -1) return info;
 
-                const Rectangle src = {
-                    .x = (float)(localId % tilesPerRow) * (float)tilemap->tileWidth,
-                    .y = localId / tilesPerRow * (float)tilemap->tileHeight,
-                    .width  = (float)tilemap->tileWidth,
-                    .height = (float)tilemap->tileHeight
-                };
+    const Tileset *ts = &tilemap->tilesets[tsIndex];
+    if (!ts || ts->texture.id == 0) return info;
 
-                const Vector2 pos = {
-                    .x = (float)(x * tilemap->tileWidth),
-                    .y = (float)(y * tilemap->tileHeight)
-                };
+    const int localId = (int)gid - ts->firstGid;
+    const int tilesPerRow = ts->texture.width / tilemap->tileWidth;
 
-                TileType type = TILE_GROUND;
-                if (ts->properties && ts->propertyCount > 0) {
-                    for (int i = 0; i < ts->propertyCount; i++) {
-                        if (ts->properties[i].id == localId) {
-                            type = ts->properties[i].type;
-                            break;
-                        }
-                    }
-                }
+    info.src = (Rectangle) {
+        .x      = (float)(localId % tilesPerRow) * (float)tilemap->tileWidth,
+        .y      = localId / tilesPerRow * (float)tilemap->tileHeight,
+        .width  = (float)tilemap->tileWidth,
+        .height = (float)tilemap->tileHeight
+    };
 
-                if (type == TILE_BORDER) continue;
+    info.pos = (Vector2) {
+        .x = (float)(x * tilemap->tileWidth),
+        .y = (float)(y * tilemap->tileHeight)
+    };
 
-                switch (type)
-                {
-                    case TILE_WALL: DrawWallTile(tilemap, ts, src, pos, x, y); break;
-                    case TILE_CARPET: DrawCarpetTile(tilemap, ts, src, pos, x, y); break;
-                    case TILE_TABLE: DrawTableTile(tilemap, ts, src, pos, x, y); break;
-                    default: DrawTextureRec(ts->texture, src, pos, WHITE); break;
-                }
+    info.type = TILE_GROUND;
+
+    if (ts->properties && ts->propertyCount > 0)
+    {
+        for (int i = 0; i < ts->propertyCount; i++)
+        {
+            if (ts->properties[i].id == localId) {
+                info.type = ts->properties[i].type;
+                break;
             }
         }
     }
 
-    for (int l = 0; l < tilemap->layerCount; l++) {
+    info.tileset = ts;
+    return info;
+}
+
+static void
+DrawTileByType(const Tilemap *tilemap, const TileDrawInfo *info, const int x, const int y)
+{
+    if (!info || !info->tileset || info->tileset->texture.id == 0) return;
+
+    switch (info->type)
+    {
+        case TILE_WALL:
+            DrawWallTile(tilemap, info->tileset, info->src, info->pos, x, y);
+            break;
+        case TILE_CARPET:
+            DrawCarpetTile(tilemap, info->tileset, info->src, info->pos, x, y);
+            break;
+        case TILE_TABLE:
+            DrawTableTile(tilemap, info->tileset, info->src, info->pos, x, y);
+            break;
+        case TILE_BORDER:
+            DrawBorderTile(tilemap, info->tileset, info->src, info->pos, x, y);
+            break;
+        default:
+            DrawTextureRec(info->tileset->texture, info->src, info->pos, WHITE);
+            break;
+    }
+}
+
+static void
+DrawNonBorderTiles(const Tilemap *tilemap)
+{
+    if (!tilemap || !tilemap->layers || tilemap->layerCount <= 0) return;
+
+    for (int l = 0; l < tilemap->layerCount; l++)
+    {
         const TileLayer *layer = &tilemap->layers[l];
+        if (!layer || !layer->data || layer->width <= 0 || layer->height <= 0) continue;
 
         for (int y = 0; y < layer->height; y++) {
             for (int x = 0; x < layer->width; x++) {
-                const unsigned int gid = layer->data[y * layer->width + x];
-                if (gid == 0) continue;
+                TileDrawInfo info = GetTileDrawInfo(tilemap, layer, x, y);
+                if (info.type == TILE_NONE || info.type == TILE_BORDER) continue;
 
-                const int tsIndex = FindTilesetIndex(tilemap, gid);
-                if (tsIndex == -1) continue;
-
-                const Tileset *ts = &tilemap->tilesets[tsIndex];
-                const int localId = (int)gid - ts->firstGid;
-                const int tilesPerRow = ts->texture.width / tilemap->tileWidth;
-
-                const Rectangle src = {
-                    .x = (float)(localId % tilesPerRow) * (float)tilemap->tileWidth,
-                    .y = localId / tilesPerRow * (float)tilemap->tileHeight,
-                    .width  = (float)tilemap->tileWidth,
-                    .height = (float)tilemap->tileHeight
-                };
-
-                const Vector2 pos = {
-                    .x = (float)(x * tilemap->tileWidth),
-                    .y = (float)(y * tilemap->tileHeight)
-                };
-
-                TileType type = TILE_GROUND;
-                if (ts->properties && ts->propertyCount > 0) {
-                    for (int i = 0; i < ts->propertyCount; i++) {
-                        if (ts->properties[i].id == localId) {
-                            type = ts->properties[i].type;
-                            break;
-                        }
-                    }
-                }
-
-                if (type == TILE_BORDER) {
-                    DrawBorderTile(tilemap, ts, src, pos, x, y);
-                }
+                DrawTileByType(tilemap, &info, x, y);
             }
         }
     }
 }
 
-TileType GetTileType(const Tilemap *tilemap, const int layerIndex,
-                     const int x, const int y)
+static void
+DrawBorderTiles(const Tilemap *tilemap)
+{
+    assert(tilemap != NULL && tilemap->layers != NULL);
+
+    for (int l = 0; l < tilemap->layerCount; l++)
+    {
+        const TileLayer *layer = &tilemap->layers[l];
+        if (!layer || !layer->data || layer->width <= 0 || layer->height <= 0) continue;
+
+        for (int y = 0; y < layer->height; y++) {
+            for (int x = 0; x < layer->width; x++) {
+                TileDrawInfo info = GetTileDrawInfo(tilemap, layer, x, y);
+                if (info.type != TILE_BORDER) continue;
+
+                DrawTileByType(tilemap, &info, x, y);
+            }
+        }
+    }
+}
+
+void DrawTilemap(const Tilemap *tilemap)
+{
+    if (!tilemap || tilemap->layerCount <= 0 || !tilemap->layers) return;
+
+    DrawNonBorderTiles(tilemap);
+    DrawBorderTiles(tilemap);
+}
+
+TileType
+GetTileType(const Tilemap *tilemap, const int layerIndex, const int x, const int y)
 {
     if (!IsTileValid(x, y, tilemap->width, tilemap->height)) return TILE_NONE;
     if (layerIndex < 0 || layerIndex >= tilemap->layerCount) return TILE_NONE;
