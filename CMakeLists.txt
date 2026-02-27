@@ -14,15 +14,22 @@ include_directories(include)
 
 set(SOURCES
         src/main.c
-        src/player.c
-        src/game.c
-        src/tilemap.c
-        src/camera.c
-        src/collision.c
-        src/item.c
-        src/screens/title.c
-        src/screens/gameplay.c
-        src/screens/options.c
+        src/utils.c
+        src/tilemap/tilemap.c
+        src/tilemap/tilemap_internal.c
+        src/tilemap/autotiles/border.c
+        src/tilemap/autotiles/wall.c
+        src/tilemap/autotiles/carpet.c
+        src/tilemap/autotiles/table.c
+        # src/player.c
+        # src/game.c
+        # src/tilemap.c
+        # src/camera.c
+        # src/collision.c
+        # src/item.c
+        # src/screens/title.c
+        # src/screens/gameplay.c
+        # src/screens/options.c
 )
 
 add_executable(rpg ${SOURCES})
